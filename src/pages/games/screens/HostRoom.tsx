@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { QRCodeSVG } from 'qrcode.react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Skeleton from '../../../components/ui/Skeleton'
@@ -67,10 +68,19 @@ export default function HostRoom() {
 
       {s.status === 'lobby' && (
         <section className="text-center">
-          <p className="text-slate-300">
-            Go to <span className="font-semibold text-white">{window.location.host}/games</span> and enter
-          </p>
-          <p className="my-4 font-display text-6xl font-bold tracking-[0.2em] text-cyan-300 sm:text-8xl">{code}</p>
+          <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10">
+            <div className="rounded-2xl bg-white p-3">
+              <QRCodeSVG value={joinUrl} size={160} marginSize={0} title="Scan to join" />
+            </div>
+            <div>
+              <p className="text-slate-300">
+                Scan, or go to <span className="font-semibold text-white">{window.location.host}/games</span> and enter
+              </p>
+              <p className="my-3 font-display text-6xl font-bold tracking-[0.2em] text-cyan-300 sm:text-8xl">
+                {code}
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => void navigator.clipboard?.writeText(joinUrl)}
@@ -88,9 +98,10 @@ export default function HostRoom() {
                 {s.scores.map((p) => (
                   <motion.li
                     key={p.user_id}
-                    initial={{ scale: 0.5, opacity: 0 }}
+                    initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.5, opacity: 0 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
                     className="rounded-full bg-white/10 px-4 py-2 font-semibold"
                   >
                     {p.nickname}
