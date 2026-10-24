@@ -19,7 +19,8 @@ src/
 ├── main.tsx
 ├── index.css                # Tailwind + theme colors/fonts
 ├── lib/
-│   └── nasa.ts              # shared NASA API calls (APOD, asteroids) + 1h cache
+│   ├── nasa.ts              # shared NASA API calls (APOD, asteroids) + 1h cache
+│   └── supabase.ts          # shared Supabase client + anonymous sign-in
 ├── hooks/
 │   └── useAsync.ts          # loading / error / success state
 ├── components/              # shared across all pages
@@ -37,7 +38,9 @@ src/
     │   └── components/
     └── games/               # Module 3 – multiplayer quiz ("/games")
         ├── GamesPage.tsx
+        ├── api/quizApi.ts   # typed calls to the quiz functions + realtime
         └── components/
+supabase/                    # quiz database: migration, seed, setup steps (see supabase/README.md)
 ```
 
 ## Team split (3 people)
