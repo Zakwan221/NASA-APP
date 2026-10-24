@@ -59,6 +59,30 @@ Each person owns one folder and only edits inside it:
 
 Add a page: create `src/pages/<name>/`, add a route in `App.tsx`, add a link in `components/navbar/navLinks.ts`.
 
+## Claude Code setup (shared)
+
+The repo ships the team's Claude Code tools, so everyone gets the same ones after `git pull`.
+
+| Tool | Where | What it's for |
+|---|---|---|
+| UI UX Pro Max | `.claude/skills/ui-ux-pro-max/` | Design system, colours, fonts, UI review |
+| Supabase + Postgres best practices | `.claude/skills/supabase*/` | RLS, migrations, Realtime, database functions |
+| Taste Skill | `.claude/skills/taste-skill/` | Art direction, layout, photos; checks the page in a browser |
+| Emil Kowalski motion | `.claude/skills/emil-design-eng/`, `review-animations/` | When and how to animate (Framer Motion), and animation reviews |
+| Context7 | plugin (`.claude/settings.json`) | Current docs for Vite, Tailwind v4, React Router, Framer Motion |
+| Playwright | plugin | Claude tests the app in a real browser |
+| Superpowers | plugin | Plan first, then build, for bigger features |
+| Supabase MCP (read-only) | `.mcp.json` | Claude reads our tables and logs to debug |
+
+First time, from the repo folder:
+
+1. Run `claude` and choose **Trust this folder**. Approve the plugin install and the `supabase` MCP server when asked.
+2. The skills load on their own. UI UX Pro Max needs Python 3 (`python --version`) and Taste Skill needs Node 22+ and Chrome or Edge; install what's missing.
+   Use one design flow so the modules match: UI UX Pro Max sets the design system, Taste shapes each page, Emil's skills handle motion.
+3. Run `/mcp`, pick `supabase`, and log in to Supabase. You need to be a member of the org that owns the Orbitly project. The server is read-only, so schema changes still go through `supabase/migrations/`.
+
+Never paste the Supabase `service_role` / secret key into Claude or the repo.
+
 ## Tech
 
 React + Vite + TypeScript · Tailwind CSS v4 · React Router · React Three Fiber · Framer Motion
