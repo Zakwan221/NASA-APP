@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-space-950: #050816;
+  --color-space-900: #0a1024;
+  --color-space-800: #121a38;
+  --color-space-700: #1d2750;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'Manrope', system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-space-950 font-sans text-slate-100 antialiased;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+}
+
+@utility glow-cyan {
+  box-shadow: 0 0 24px -4px rgb(34 211 238 / 0.55);
+}
+
+@utility glow-violet {
+  box-shadow: 0 0 24px -4px rgb(139 92 246 / 0.55);
+}
+
+@utility card {
+  @apply rounded-2xl border border-white/10 bg-space-900/70 backdrop-blur;
+}
