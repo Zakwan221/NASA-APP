@@ -30,7 +30,8 @@ src/
 └── pages/
     ├── home/                # Module 1 – Home page  ("/")
     │   ├── HomePage.tsx
-    │   └── components/      # Hero, EarthScene, AsteroidStat, ApodSection, HowItWorks
+    │   ├── components/      # Hero, EarthScene, AsteroidStat, ApodSection, HowItWorks
+    │   └── assets/          # earth.jpg (home-only images)
     ├── info/                # Module 2 – NASA stories ("/info")
     │   ├── InfoPage.tsx
     │   └── components/
@@ -38,6 +39,20 @@ src/
         ├── GamesPage.tsx
         └── components/
 ```
+
+## Team split (3 people)
+
+Each person owns one folder and only edits inside it:
+
+| Module | Folder | Route |
+|---|---|---|
+| 1 – Home | `src/pages/home/` | `/` |
+| 2 – Info | `src/pages/info/` | `/info` |
+| 3 – Games | `src/pages/games/` | `/games` |
+
+- Page-only components, images and data go in your page folder (`components/`, `assets/`). Import images, don't put them in `public/`.
+- Shared files (`lib/`, `hooks/`, `components/`, `index.css`, `App.tsx`, `navLinks.ts`) affect everyone — tell the team before changing them.
+- Need a new NASA call? Add it to `lib/nasa.ts` so other pages can reuse it.
 
 Add a page: create `src/pages/<name>/`, add a route in `App.tsx`, add a link in `components/navbar/navLinks.ts`.
 

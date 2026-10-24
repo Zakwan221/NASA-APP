@@ -3,8 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { AdditiveBlending, BackSide, Group, SRGBColorSpace } from 'three'
 import ErrorBoundary from '../../../components/ui/ErrorBoundary'
-
-const EARTH_TEXTURE = '/textures/earth.jpg'
+import EARTH_TEXTURE from '../assets/earth.jpg'
 const FALLBACK_COLOR = '#1e4fd8'
 
 function EarthMaterial() {
