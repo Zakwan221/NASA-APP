@@ -100,7 +100,12 @@ export default function PlayerRoom() {
 
       {s.status === 'reveal' && s.reveal && s.question && (
         <section className="text-center">
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-6">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+            className="mb-6"
+          >
             {mine?.last_correct ? (
               <>
                 <p className="text-6xl" aria-hidden="true">
