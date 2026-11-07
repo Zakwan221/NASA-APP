@@ -7,12 +7,13 @@ import {
   downlinkPerMonthMbit,
   runMonth,
   startOperate,
-  summarize,
   toggleInstrument,
   type FlightSpacecraft,
   type OperateState,
 } from '../../../game/events/operate'
 import { newSeed } from '../../../game/events/random'
+import ReportScreen from '../report/ReportScreen'
+import { MissionLog, Stat } from './parts'
 import { PLACEHOLDER_CRAFT } from './placeholderCraft'
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
@@ -35,7 +36,7 @@ export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: Fli
   if (state.ended) {
     return (
       <Shell>
-        <EndScreen craft={craft} state={state} onRestart={() => setState(startOperate(craft, newSeed()))} />
+        <ReportScreen craft={craft} state={state} onFlyAgain={() => setState(startOperate(craft, newSeed()))} />
       </Shell>
     )
   }
@@ -263,80 +264,3 @@ function Gauge(props: {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-slate-400">{label}</dt>
-      <dd className="font-semibold tabular-nums">{value}</dd>
-    </div>
-  )
-}
-
-const TONE = { good: 'text-emerald-300', bad: 'text-rose-300', info: 'text-slate-200' }
-
-function MissionLog({ state }: { state: OperateState }) {
-  if (state.log.length === 0) return null
-  return (
-    <section className="mt-6 text-left">
-      <h2 className="mb-3 text-lg font-semibold">Mission log</h2>
-      <ol className="space-y-2">
-        {[...state.log].reverse().map((l, idx) => (
-          <li key={`${l.month}-${idx}`} className="card p-4 text-sm">
-            <p className={`font-semibold ${TONE[l.tone]}`}>
-              Month {l.month} · {l.title}
-            </p>
-            <p className="mt-1 text-slate-300">{l.text}</p>
-          </li>
-        ))}
-      </ol>
-    </section>
-  )
-}
-
-function EndScreen({ craft, state, onRestart }: { craft: FlightSpacecraft; state: OperateState; onRestart: () => void }) {
-  const s = summarize(craft, state)
-  const scienceShare = s.scienceReturned / s.scienceTarget
-  return (
-    <section className="text-center">
-      <p className="text-6xl" aria-hidden="true">
-        {s.success ? '🛰️' : '💥'}
-      </p>
-      <h1 className="mt-4 text-3xl font-bold">{s.success ? 'Mission complete' : 'Mission over'}</h1>
-      <p className="mt-2 text-slate-300">{s.reason}</p>
-
-      <dl className="card mt-6 grid grid-cols-2 gap-4 p-5 text-left text-sm sm:grid-cols-3">
-        <Stat label="Months flown" value={`${s.monthsFlown} / ${s.totalMonths}`} />
-        <Stat label="Science sent home" value={`${s.scienceReturned.toLocaleString()} (${Math.round(scienceShare * 100)}%)`} />
-        <Stat label="Data lost" value={`${(s.dataLostMbit / 1000).toFixed(1)} Gbit`} />
-        <Stat label="Budget left" value={`$${s.budgetLeftM.toFixed(2)} M`} />
-        <Stat label="Health" value={`${s.health}%`} />
-        <Stat label="Decisions" value={`${s.log.length}`} />
-      </dl>
-
-      <div className="mt-6 space-y-2 text-left">
-        {s.dataLostMbit > 0 && (
-          <p className="rounded-xl bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-            {(s.dataLostMbit / 1000).toFixed(0)} Gbit of data never reached Earth. The radio and ground passes could not keep
-            up with the instruments. Try a faster radio, more storage, or switching an instrument off.
-          </p>
-        )}
-        {scienceShare < 1 && (
-          <p className="rounded-xl bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-            The science goal was not reached. More solar power lets instruments run all the time, and an orbit with better
-            coverage makes each day count more.
-          </p>
-        )}
-      </div>
-
-      <MissionLog state={state} />
-
-      <button
-        type="button"
-        onClick={onRestart}
-        className="glow-violet mt-8 min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
-      >
-        Fly again
-      </button>
-    </section>
-  )
-}
