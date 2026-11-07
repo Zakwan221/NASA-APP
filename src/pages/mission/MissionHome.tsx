@@ -20,6 +20,12 @@ const OPTIONS = [
     title: 'Join a team',
     text: 'Enter the 6-digit code on the host’s screen.',
   },
+  {
+    to: '/mission/leaderboard',
+    icon: '🏆',
+    title: 'Leaderboard',
+    text: 'See the best missions so far, and why they scored what they did.',
+  },
 ]
 
 /** /mission: pick solo or team play */
