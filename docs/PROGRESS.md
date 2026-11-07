@@ -17,15 +17,15 @@ Last updated 7 Nov 2026. Plan and full split: [PLAN.md](PLAN.md). Hackathon: 14�
 | #7 | Operate phase: fly month by month (sun and shadow, battery, storage, downlink, budget, health), 5 random events with 2 choices each, mission log that says why | `src/game/events/`, `src/pages/mission/operate/` |
 | #8 | Mission button in the navbar | `src/components/navbar/navLinks.ts` |
 | #9 | Report: score out of 100 with a reason and a tip for each part, compared with the last attempt, Fly again | `src/pages/mission/report/` |
+| #12 | Public leaderboard (solo and teams), post your solo score, share link with "Try to beat" compare | `supabase/migrations/20261107040000_mission_leaderboard.sql`, `src/pages/mission/leaderboard/` |
 | #10 | Team mode: up to 4 phones fly one mission, lobby with QR, role cards, event votes, shared score, team leaderboard | `supabase/migrations/20261107020000_mission_ops.sql`, `src/multiplayer/`, `src/pages/mission/team/` |
 
-**Supabase:** run both `20261107…` files in the SQL Editor (mission rooms, then mission ops). Team mode needs both.
+**Supabase:** run the three `20261107…` files in the SQL Editor, in order (mission rooms, mission ops, mission leaderboard).
 
 ### Still to do
 
 - Connect Operate and team mode to Zakwan's real spacecraft once Design and Launch exist (replace `PLACEHOLDER_CRAFT`).
 - Team mode for Design and Launch: each role edits its own section live, the team votes to move on.
-- Save, share and compare missions; public leaderboard page.
 - Mobile testing and bug fixes (13 Nov). Project page and submission (14–15 Nov).
 
 ### Drafts Adaam made in other people's folders
