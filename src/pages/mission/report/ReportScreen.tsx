@@ -4,6 +4,7 @@ import { summarize, type FlightSpacecraft, type OperateState } from '../../../ga
 import { grade, scoreMission, type MissionScore } from '../../../game/scoring/score'
 import { MissionLog, Stat } from '../operate/parts'
 import { loadAttempts, saveAttempt, type Attempt } from './attempts'
+import PostScore from './PostScore'
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
@@ -126,6 +127,8 @@ export default function ReportScreen({
         <Stat label="Budget left" value={`$${summary.budgetLeftM.toFixed(2)} M`} />
         <Stat label="Health" value={`${summary.health}%`} />
       </dl>
+
+      {solo && <PostScore craft={craft} score={score} />}
 
       {footer}
 

@@ -53,6 +53,8 @@ export interface ResultPayload {
   attempt: number
   total: number
   score: ScoreBreakdown
+  /** Id for the share page /mission/r/<id>. Only in the live broadcast, not after a reload. */
+  result_id?: string
 }
 
 export type MissionOpKind = 'toggle' | 'fly' | 'choice'
@@ -87,7 +89,11 @@ export interface MissionState {
   results: ResultPayload[]
 }
 
+export type LeaderboardMode = 'all' | 'solo' | 'team'
+
 export interface LeaderboardRow {
+  /** Opens its share page: /mission/r/<id> */
+  id: string
   team_name: string
   total: number
   difficulty: string
@@ -159,8 +165,37 @@ export const getMissionOps = (roomId: string) => rpc<MissionOps>('get_mission_op
 
 export const getMissionState = (code: string) => rpc<MissionState>('get_mission_state', { p_code: code })
 
-export const getLeaderboard = (scenarioId: string, limit = 10) =>
-  rpc<LeaderboardRow[]>('get_leaderboard', { p_scenario_id: scenarioId, p_limit: limit })
+export const getLeaderboard = (scenarioId: string, limit = 10, mode: LeaderboardMode = 'all') =>
+  rpc<LeaderboardRow[]>('get_leaderboard', { p_scenario_id: scenarioId, p_limit: limit, p_mode: mode })
+
+/* ---------------- solo results and share links (20261107040000_mission_leaderboard.sql) ---------------- */
+
+/** Post a finished solo mission to the leaderboard. Returns the id for its share link. */
+export const submitSoloResult = (
+  name: string,
+  scenarioId: string,
+  difficulty: string,
+  score: ScoreBreakdown,
+  design: Record<string, unknown> = {},
+) =>
+  rpc<{ id: string; total: number }>('submit_solo_result', {
+    p_name: name,
+    p_scenario_id: scenarioId,
+    p_difficulty: difficulty,
+    p_score: score,
+    p_design: design,
+  })
+
+export interface SharedResult extends Omit<LeaderboardRow, 'id'> {
+  id: string
+  scenario_id: string
+  /** The full score, with `parts` (reasons and tips) when the phone sent them */
+  score: ScoreBreakdown & { parts?: { key: string; label: string; points: number; max: number; reason: string }[] }
+  /** Place on the scenario's board, 1 = best */
+  rank: number
+}
+
+export const getSharedResult = (id: string) => rpc<SharedResult>('get_shared_result', { p_id: id })
 
 /* ---------------- realtime ---------------- */
 

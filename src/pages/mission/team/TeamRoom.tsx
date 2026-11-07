@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { MissionEvent } from '../../../game/events/events'
 import { summarize, type OperateState } from '../../../game/events/operate'
@@ -11,18 +11,18 @@ import {
   advancePhase,
   castBallot,
   claimRole,
-  getLeaderboard,
   proposeVote,
   startOperate,
   submitMissionResult,
   type CrewMember,
-  type LeaderboardRow,
   type VotePayload,
 } from '../../../multiplayer/missionApi'
 import { replayOps } from '../../../multiplayer/replay'
 import { errorText, useMissionRoom } from '../../../multiplayer/useMissionRoom'
 import { OperateView, Shell } from '../operate/OperatePage'
 import { PLACEHOLDER_CRAFT } from '../operate/placeholderCraft'
+import LeaderboardTable from '../leaderboard/LeaderboardTable'
+import { scenarioName } from '../leaderboard/shared'
 import ReportScreen from '../report/ReportScreen'
 
 // Until Design and Launch exist, every team flies the placeholder spacecraft
@@ -426,27 +426,15 @@ function EventVote(props: {
 /* ---------------- report: leaderboard ---------------- */
 
 function TeamLeaderboard({ scenarioId, attempt }: { scenarioId: string; attempt: number }) {
-  const [rows, setRows] = useState<LeaderboardRow[] | null>(null)
-  useEffect(() => {
-    getLeaderboard(scenarioId)
-      .then(setRows)
-      .catch(() => setRows([]))
-  }, [scenarioId, attempt])
-
-  if (!rows?.length) return null
   return (
-    <section className="card mt-6 p-5">
-      <h2 className="font-semibold">Leaderboard · Earth watch</h2>
-      <ol className="mt-3 space-y-1 text-sm">
-        {rows.map((r, idx) => (
-          <li key={`${r.team_name}-${idx}`} className="flex justify-between gap-4 tabular-nums">
-            <span>
-              {idx + 1}. {r.team_name} <span className="text-slate-500">({r.crew_size} crew)</span>
-            </span>
-            <span className="font-semibold">{r.total}</span>
-          </li>
-        ))}
-      </ol>
+    <section className="card mt-6 p-3 sm:p-4">
+      <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
+        <h2 className="font-semibold">Leaderboard · {scenarioName(scenarioId)}</h2>
+        <Link to="/mission/leaderboard" className="text-sm text-cyan-300 underline-offset-4 hover:underline">
+          See all
+        </Link>
+      </div>
+      <LeaderboardTable scenarioId={scenarioId} limit={5} refreshKey={attempt} compact />
     </section>
   )
 }
