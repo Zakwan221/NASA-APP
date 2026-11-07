@@ -7,7 +7,7 @@ import OperatePage from './operate/OperatePage'
  * /mission/design   Zakwan (todo)
  * /mission/launch   Zakwan (todo)
  * /mission/operate  Adaam: fly month by month (uses a placeholder spacecraft for now)
- * /mission/report   Adaam (todo)
+ * /mission/report   Adaam: shown at the end of Operate (ReportScreen), no route of its own yet
  */
 export default function MissionPage() {
   return (

@@ -65,6 +65,8 @@ export interface LogEntry {
   title: string
   text: string
   tone: 'good' | 'bad' | 'info'
+  /** true when it records a choice the team made */
+  decision?: boolean
 }
 
 export interface PendingEvent {
@@ -95,6 +97,8 @@ export interface OperateState {
   scienceReturned: number
   dataSentMbit: number
   dataLostMbit: number
+  /** Sum of each month's instrument uptime (0..1), for the average */
+  uptimeSum: number
   /** Instrument id → switched on */
   instrumentsOn: Record<string, boolean>
   brokenInstruments: string[]
@@ -148,6 +152,7 @@ export function startOperate(craft: FlightSpacecraft, seed: number): OperateStat
     scienceReturned: 0,
     dataSentMbit: 0,
     dataLostMbit: 0,
+    uptimeSum: 0,
     instrumentsOn: Object.fromEntries(craft.instruments.map((i) => [i.id, true])),
     brokenInstruments: [],
     pending: null,
@@ -190,7 +195,13 @@ export function chooseEventOption(craft: FlightSpacecraft, state: OperateState, 
     pending: null,
     log: [
       ...result.state.log,
-      { month: state.month + 1, title: `${event.title}: ${choice.label}`, text: result.message, tone: result.tone },
+      {
+        month: state.month + 1,
+        title: `${event.title}: ${choice.label}`,
+        text: result.message,
+        tone: result.tone,
+        decision: true,
+      },
     ],
   }
 }
@@ -308,6 +319,7 @@ export function runMonth(craft: FlightSpacecraft, state: OperateState): OperateS
     scienceReturned: state.scienceReturned + scienceReturned,
     dataSentMbit: state.dataSentMbit + sent,
     dataLostMbit: state.dataLostMbit + lost,
+    uptimeSum: state.uptimeSum + (m.safeMode ? 0 : instrumentUptime),
     modifiers: { ...NO_MODIFIERS },
     lastReport: report,
   }
@@ -362,12 +374,17 @@ export interface OperateSummary {
   reason: string
   monthsFlown: number
   totalMonths: number
+  /** What the Mission Planner asked for, before any months were lost */
+  plannedMonths: number
   scienceReturned: number
   scienceTarget: number
   dataSentMbit: number
   dataLostMbit: number
   budgetLeftM: number
+  startBudgetM: number
   health: number
+  /** Average share of each month the instruments ran, 0..1 */
+  averageUptime: number
   log: LogEntry[]
 }
 
@@ -377,12 +394,15 @@ export function summarize(craft: FlightSpacecraft, state: OperateState): Operate
     reason: state.ended?.reason ?? 'The mission is still flying.',
     monthsFlown: state.month,
     totalMonths: state.totalMonths,
+    plannedMonths: craft.targetLifetimeMonths,
     scienceReturned: Math.round(state.scienceReturned),
     scienceTarget: craft.scenario.scienceTarget,
     dataSentMbit: Math.round(state.dataSentMbit),
     dataLostMbit: Math.round(state.dataLostMbit),
     budgetLeftM: state.budgetLeftM,
+    startBudgetM: craft.budgetLeftM,
     health: state.health,
+    averageUptime: state.month > 0 ? state.uptimeSum / state.month : 0,
     log: state.log,
   }
 }
