@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMemo, useState, type ReactNode } from 'react'
-import { EVENTS } from '../../../game/events/events'
+import { EVENTS, type MissionEvent } from '../../../game/events/events'
 import {
   activeInstruments,
   chooseEventOption,
@@ -18,20 +18,9 @@ import { PLACEHOLDER_CRAFT } from './placeholderCraft'
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
-/**
- * Phase 3: fly the mission month by month.
- * Solo for now; team mode will send each choice through a mission-room vote.
- */
+/** Phase 3, solo: fly the mission month by month in this browser. */
 export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: FlightSpacecraft }) {
   const [state, setState] = useState<OperateState>(() => startOperate(craft, newSeed()))
-
-  const storage = craft.parts.find((p) => p.category === 'computer')?.storageMbit ?? 0
-  const solarW = craft.parts.find((p) => p.category === 'power')?.powerGenW ?? 0
-  const busW = craft.parts.reduce((s, p) => s + p.powerDrawW, 0)
-  const instrumentW = activeInstruments(craft, state).reduce((s, i) => s + i.powerDrawW, 0)
-  const avgGenW = solarW * (1 - craft.orbit.shadowFraction) * (0.5 + state.health / 200)
-  const downlink = useMemo(() => downlinkPerMonthMbit(craft), [craft])
-  const event = state.pending ? EVENTS[state.pending.id] : null
 
   if (state.ended) {
     return (
@@ -43,6 +32,58 @@ export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: Fli
 
   return (
     <Shell>
+      <OperateView
+        craft={craft}
+        state={state}
+        onToggle={(id, on) => setState((s) => toggleInstrument(s, id, on))}
+        onChoose={(idx) => setState((s) => chooseEventOption(craft, s, idx))}
+        onFly={() => setState((s) => runMonth(craft, s))}
+      />
+    </Shell>
+  )
+}
+
+export interface OperateViewProps {
+  craft: FlightSpacecraft
+  state: OperateState
+  onToggle: (instrumentId: string, on: boolean) => void
+  onChoose: (choiceIndex: number) => void
+  onFly: () => void
+  /** Team mode: false for players who don't control the instruments */
+  canToggle?: boolean
+  /** Shown under the instruments when switching is locked */
+  toggleNote?: string
+  /** Team mode: replaces the plain choice buttons (e.g. with vote buttons) */
+  renderChoices?: (event: MissionEvent) => ReactNode
+  /** Team mode: replaces the Fly button (e.g. "Waiting for the host") */
+  flyControl?: ReactNode
+  /** Extra panel under the header (e.g. your role and goal) */
+  banner?: ReactNode
+}
+
+/** The Operate screen without its state, so solo and team mode share it. */
+export function OperateView({
+  craft,
+  state,
+  onToggle,
+  onChoose,
+  onFly,
+  canToggle = true,
+  toggleNote,
+  renderChoices,
+  flyControl,
+  banner,
+}: OperateViewProps) {
+  const storage = craft.parts.find((p) => p.category === 'computer')?.storageMbit ?? 0
+  const solarW = craft.parts.find((p) => p.category === 'power')?.powerGenW ?? 0
+  const busW = craft.parts.reduce((s, p) => s + p.powerDrawW, 0)
+  const instrumentW = activeInstruments(craft, state).reduce((s, i) => s + i.powerDrawW, 0)
+  const avgGenW = solarW * (1 - craft.orbit.shadowFraction) * (0.5 + state.health / 200)
+  const downlink = useMemo(() => downlinkPerMonthMbit(craft), [craft])
+  const event = state.pending ? EVENTS[state.pending.id] : null
+
+  return (
+    <>
       <header className="mb-6">
         <p className="text-sm font-semibold uppercase tracking-wider text-cyan-300">Phase 3 · Operate</p>
         <h1 className="mt-1 text-3xl font-bold">{craft.scenario.title}</h1>
@@ -60,6 +101,8 @@ export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: Fli
           </span>
         </div>
       </header>
+
+      {banner}
 
       {/* Resources */}
       <section aria-label="Resources" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -138,14 +181,15 @@ export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: Fli
                     role="switch"
                     className="h-6 w-6 accent-cyan-300"
                     checked={on}
-                    disabled={broken}
-                    onChange={(e) => setState((s) => toggleInstrument(s, i.id, e.target.checked))}
+                    disabled={broken || !canToggle}
+                    onChange={(e) => onToggle(i.id, e.target.checked)}
                   />
                 </label>
               </li>
             )
           })}
         </ul>
+        {toggleNote && <p className="mt-3 text-sm text-slate-400">{toggleNote}</p>}
       </section>
 
       {/* Event or next month */}
@@ -166,19 +210,23 @@ export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: Fli
             </h2>
             <p className="mt-2 text-slate-200">{event.describe(craft, state.pending)}</p>
             <p className="mt-1 text-xs text-slate-500">Real-world source: {event.source}</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {event.choices.map((c, idx) => (
-                <button
-                  key={c.label}
-                  type="button"
-                  onClick={() => setState((s) => chooseEventOption(craft, s, idx))}
-                  className="rounded-xl border border-white/15 p-4 text-left transition hover:border-white/30 hover:bg-white/5 active:scale-[0.98]"
-                >
-                  <span className="block font-semibold">{c.label}</span>
-                  <span className="text-sm text-slate-400">{c.hint}</span>
-                </button>
-              ))}
-            </div>
+            {renderChoices ? (
+              renderChoices(event)
+            ) : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {event.choices.map((c, idx) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => onChoose(idx)}
+                    className="rounded-xl border border-white/15 p-4 text-left transition hover:border-white/30 hover:bg-white/5 active:scale-[0.98]"
+                  >
+                    <span className="block font-semibold">{c.label}</span>
+                    <span className="text-sm text-slate-400">{c.hint}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </motion.section>
         ) : (
           <motion.div
@@ -189,13 +237,15 @@ export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: Fli
             transition={{ duration: 0.2 }}
             className="mt-6 text-center"
           >
-            <button
-              type="button"
-              onClick={() => setState((s) => runMonth(craft, s))}
-              className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
-            >
-              Fly month {state.month + 1} →
-            </button>
+            {flyControl ?? (
+              <button
+                type="button"
+                onClick={onFly}
+                className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
+              >
+                Fly month {state.month + 1} →
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -223,11 +273,11 @@ export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: Fli
       )}
 
       <MissionLog state={state} />
-    </Shell>
+    </>
   )
 }
 
-function Shell({ children }: { children: ReactNode }) {
+export function Shell({ children }: { children: ReactNode }) {
   return <div className="mx-auto w-full max-w-3xl px-4 pb-12 pt-20 sm:px-6 sm:pt-24">{children}</div>
 }
 
