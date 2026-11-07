@@ -45,12 +45,31 @@ export interface DesignChange<S extends Role = Role> {
 export interface PhasePayload {
   phase: MissionPhase
   attempt: number
+  /** Set when the phase becomes 'operate' */
+  ops_seed?: number
 }
 
 export interface ResultPayload {
   attempt: number
   total: number
   score: ScoreBreakdown
+}
+
+export type MissionOpKind = 'toggle' | 'fly' | 'choice'
+
+/** One move in the Operate phase. Every phone replays these in id order. */
+export interface MissionOp {
+  id: number
+  attempt: number
+  kind: MissionOpKind
+  payload: { instrumentId?: string; on?: boolean; month?: number; choice?: number }
+  by: string
+}
+
+export interface MissionOps {
+  attempt: number
+  ops_seed: number | null
+  ops: MissionOp[]
 }
 
 export interface MissionState {
@@ -129,6 +148,15 @@ export const advancePhase = (roomId: string) => rpc<PhasePayload>('advance_phase
 export const submitMissionResult = (roomId: string, teamName: string, score: ScoreBreakdown) =>
   rpc<ResultPayload>('submit_mission_result', { p_room_id: roomId, p_team_name: teamName, p_score: score })
 
+/** Host: start flying (from the lobby for now, until Design and Launch exist) */
+export const startOperate = (roomId: string) => rpc<PhasePayload>('start_operate', { p_room_id: roomId })
+
+/** Make a move: toggle (Science Lead), fly or choice (host) */
+export const addMissionOp = (roomId: string, kind: MissionOpKind, payload: MissionOp['payload']) =>
+  rpc<MissionOp>('add_mission_op', { p_room_id: roomId, p_kind: kind, p_payload: payload })
+
+export const getMissionOps = (roomId: string) => rpc<MissionOps>('get_mission_ops', { p_room_id: roomId })
+
 export const getMissionState = (code: string) => rpc<MissionState>('get_mission_state', { p_code: code })
 
 export const getLeaderboard = (scenarioId: string, limit = 10) =>
@@ -142,6 +170,7 @@ export interface MissionHandlers {
   onPhase?: (p: PhasePayload) => void
   onVote?: (v: VotePayload) => void
   onResult?: (r: ResultPayload) => void
+  onOp?: (op: MissionOp) => void
   /** Who has the screen open right now (presence), by user id */
   onOnline?: (userIds: string[]) => void
   /** Called on every (re)connect: reload with getMissionState() here */
@@ -162,6 +191,7 @@ export function connectToMission(code: string, userId: string, handlers: Mission
     .on('broadcast', { event: 'phase' }, ({ payload }) => handlers.onPhase?.(payload as PhasePayload))
     .on('broadcast', { event: 'vote' }, ({ payload }) => handlers.onVote?.(payload as VotePayload))
     .on('broadcast', { event: 'result' }, ({ payload }) => handlers.onResult?.(payload as ResultPayload))
+    .on('broadcast', { event: 'op' }, ({ payload }) => handlers.onOp?.(payload as MissionOp))
     .on('presence', { event: 'sync' }, () => handlers.onOnline?.(Object.keys(channel.presenceState())))
     .subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {

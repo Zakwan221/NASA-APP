@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { summarize, type FlightSpacecraft, type OperateState } from '../../../game/events/operate'
 import { grade, scoreMission, type MissionScore } from '../../../game/scoring/score'
 import { MissionLog, Stat } from '../operate/parts'
@@ -12,23 +12,36 @@ export default function ReportScreen({
   craft,
   state,
   onFlyAgain,
+  team = false,
+  previousTotal,
+  footer,
 }: {
   craft: FlightSpacecraft
   state: OperateState
-  onFlyAgain: () => void
+  /** Missing for team players who are not the host: they wait for the host */
+  onFlyAgain?: () => void
+  team?: boolean
+  /** Team mode: the room's last attempt. Leave out to use this browser's solo history. */
+  previousTotal?: number | null
+  /** Extra content under the stats, e.g. the team leaderboard */
+  footer?: ReactNode
 }) {
-  const summary = summarize(craft, state)
-  const [score] = useState<MissionScore>(() => scoreMission(summary))
+  const summary = useMemo(() => summarize(craft, state), [craft, state])
+  // Recomputed if late moves arrive, so every phone shows the same score
+  const score: MissionScore = useMemo(() => scoreMission(summary, { team }), [summary, team])
+  const solo = previousTotal === undefined
   // The attempt before this one, read before this one is saved
-  const [previous] = useState<Attempt | null>(() => loadAttempts(craft.scenario.id).at(-1) ?? null)
+  const [previous] = useState<Pick<Attempt, 'total'> | null>(() =>
+    solo ? (loadAttempts(craft.scenario.id).at(-1) ?? null) : previousTotal === null ? null : { total: previousTotal },
+  )
 
   // Save once per finished mission (the ref stops React's dev double-run saving twice)
   const saved = useRef(false)
   useEffect(() => {
-    if (saved.current) return
+    if (saved.current || !solo) return
     saved.current = true
     saveAttempt(craft.scenario.id, { total: score.total, science: summary.scienceReturned, at: Date.now() })
-  }, [craft.scenario.id, score.total, summary.scienceReturned])
+  }, [craft.scenario.id, score.total, summary.scienceReturned, solo])
 
   const g = grade(score.total)
   const diff = previous ? score.total - previous.total : null
@@ -114,17 +127,25 @@ export default function ReportScreen({
         <Stat label="Health" value={`${summary.health}%`} />
       </dl>
 
+      {footer}
+
       <MissionLog state={state} />
 
       <div className="mt-8 text-center">
-        <button
+        {onFlyAgain ? (
+          <>
+            <button
           type="button"
           onClick={onFlyAgain}
           className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
         >
           Fly again
-        </button>
-        <p className="mt-2 text-sm text-slate-400">Change your strategy and try to beat {score.total}.</p>
+            </button>
+            <p className="mt-2 text-sm text-slate-400">Change your strategy and try to beat {score.total}.</p>
+          </>
+        ) : (
+          <p className="text-slate-400">Waiting for the host to start the next attempt…</p>
+        )}
       </div>
     </section>
   )
