@@ -80,14 +80,25 @@ docs/            this plan
 
 ## 4. Who does what (7–15 Nov)
 
-| Dates | Zakwan | Adaam |
+Three people, each owning their own folders so we don't step on each other.
+
+| Person | Owns | Folders |
 |---|---|---|
-| 7–8 Nov | Data tables + engine + tests | Supabase mission rooms, roles, votes |
-| 9–10 Nov | Design + Launch phases, dashboard | Operate phase, random events, report |
-| 11 Nov | Connect phases, redesign loop | Online team mode |
-| 12 Nov | In-game help, Learn page, Home text | Leaderboard, save/share, mobile testing |
-| 13 Nov | Bug fixes, 2nd scenario if time | Bug fixes |
-| 14–15 Nov | Video, slides, project page, submit | Same |
+| **Zakwan** | Game engine (rules, resource maths, scoring, tests), Design and Launch phases, dashboard, Home text | `src/game/engine/`, `src/game/scoring/`, `src/store/`, `src/pages/mission/design/`, `src/pages/mission/launch/`, `src/pages/home/` |
+| **Adaam** | Supabase mission rooms, roles, votes, Operate phase, random events, Report, online team mode, leaderboard, save/share | `supabase/migrations/`, `src/multiplayer/`, `src/game/events/`, `src/pages/mission/operate/`, `src/pages/mission/report/`, `src/pages/games/` |
+| **Ibad** | Data tables from NASA sources, scenarios, NASA API snapshots, in-game "What is this?" explanations, Learn page, Sources page, video and slides lead | `src/game/data/`, `src/pages/info/`, `docs/` |
+
+**Shared contract (agree on 7 Nov):** the shape of a part, instrument, orbit, rocket and scenario in `src/game/types.ts`. Zakwan writes it, Ibad fills the data, Adaam stores it in Supabase. Change it only with a heads-up to everyone.
+
+| Dates | Zakwan | Adaam | Ibad |
+|---|---|---|---|
+| 7 Nov | Write `types.ts` with the team | Mission room tables + RLS | List parts, instruments, orbits, rockets with numbers from the NASA report |
+| 8 Nov | Engine: mass, power, budget, data, lifetime + Vitest | Roles, votes, room join (reuse quiz code) | Earth watch scenario + EONET/EPIC snapshot JSON |
+| 9–10 Nov | Design + Launch phases, live dashboard, rocket fit check | Operate phase (turns, sun/shadow, ground passes) + random events | Explanations for every part, orbit and resource; warning texts that say why |
+| 11 Nov | Connect phases, redesign loop | Report + online team mode | Learn page + Sources page |
+| 12 Nov | Home text, difficulty levels | Leaderboard, save/share/compare, mobile testing | 2nd scenario data (Solar storm, DONKI/SDO) + start video script |
+| 13 Nov | Bug fixes | Bug fixes | Test full game as a new player, write bug list |
+| 14–15 Nov | Demo walkthrough | Project page + submit | 30 s video, slides |
 
 ## 5. Rules for us
 
@@ -100,4 +111,4 @@ docs/            this plan
 ## 6. Still open
 
 - Read the challenge's **Resources** tab and add the suggested NASA datasets here.
-- Confirm with the KL organiser that code written before 14 Nov is allowed.
+- Confirm in writing with the KL organiser that code written before 14 Nov is allowed (team believes yes).
