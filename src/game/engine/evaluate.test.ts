@@ -18,6 +18,8 @@ const GOOD: MissionDesign = {
 }
 
 const blocking = (d: MissionDesign) => evaluate(d).warnings.filter((w) => w.blocking).map((w) => w.message)
+/** Launch problems are risks (they lower the odds) rather than blockers */
+const risks = (d: MissionDesign) => evaluate(d).warnings.filter((w) => !w.blocking).map((w) => w.message)
 
 describe('evaluate', () => {
   it('blocks an empty design and explains each missing piece', () => {
@@ -41,36 +43,37 @@ describe('evaluate', () => {
     expect(blocking(d).some((m) => m.includes('Too heavy'))).toBe(true)
   })
 
-  it('blocks a spacecraft too heavy for the rocket', () => {
+  it('warns, without blocking, when the spacecraft is too heavy for the rocket', () => {
     const d: MissionDesign = {
       ...GOOD,
       engineer: { ...GOOD.engineer, structureId: 'bus-micro', solarId: 'solar-large', batteryId: 'battery-200' },
       science: { instrumentIds: ['camera', 'thermal-ir', 'spectro'] },
     }
-    expect(blocking(d).some((m) => m.includes('can only carry'))).toBe(true)
+    expect(risks(d).some((m) => m.includes('can only carry'))).toBe(true)
+    expect(evaluate(d).launchReady).toBe(true)
   })
 
-  it('blocks a radio that cannot be heard from the orbit', () => {
+  it('warns when the radio cannot be heard from the orbit', () => {
     const d: MissionDesign = {
       ...GOOD,
       comms: { radioId: 'sband', orbitId: 'l1', launchVehicleId: 'deep-rideshare' },
     }
-    expect(blocking(d).some((m) => m.includes('nobody on Earth would hear it'))).toBe(true)
+    expect(risks(d).some((m) => m.includes('nobody on Earth would hear it'))).toBe(true)
   })
 
-  it('blocks a rocket that cannot reach the orbit', () => {
+  it('warns when the rocket cannot reach the orbit', () => {
     const d: MissionDesign = { ...GOOD, comms: { ...GOOD.comms, orbitId: 'geo' } }
-    expect(blocking(d).some((m) => m.includes('can’t reach'))).toBe(true)
+    expect(risks(d).some((m) => m.includes('can’t reach'))).toBe(true)
   })
 
-  it('blocks going over budget', () => {
+  it('warns when going over budget', () => {
     const d: MissionDesign = {
       ...GOOD,
       planner: { ...GOOD.planner, difficulty: 'director', targetLifetimeMonths: 18 },
       comms: { ...GOOD.comms, launchVehicleId: 'small-launcher' },
       science: { instrumentIds: ['camera', 'thermal-ir', 'spectro'] },
     }
-    expect(blocking(d).some((m) => m.startsWith('Over budget'))).toBe(true)
+    expect(risks(d).some((m) => m.startsWith('Over budget'))).toBe(true)
   })
 
   it('warns, without blocking, when power is short or data will be lost', () => {

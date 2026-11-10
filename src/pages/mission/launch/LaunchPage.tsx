@@ -1,10 +1,19 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { CircleCheck, CircleX, Flame, Rocket, Rotate3d, TriangleAlert, X, type LucideIcon } from 'lucide-react'
+import { CircleCheck, CircleX, Flame, Orbit, Rocket, Rotate3d, TriangleAlert, WifiOff, X, type LucideIcon } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ORBITS, ROCKETS } from '../../../game/data'
 import { evaluate } from '../../../game/engine/evaluate'
-import { failureChance, launchRisk, missionOutlook, rollLaunch, type LaunchOutcome } from '../../../game/engine/launch'
+import {
+  failureChance,
+  holdLabel,
+  launchOdds,
+  launchRisk,
+  missionOutlook,
+  rollLaunch,
+  type LaunchOdds,
+  type LaunchOutcome,
+} from '../../../game/engine/launch'
 import { useMission } from '../../../store/missionStore'
 import Dashboard, { MiniStatus } from '../design/components/Dashboard'
 import OptionCard, { CardRow, CardSlot } from '../design/components/OptionCard'
@@ -23,8 +32,9 @@ export default function LaunchPage() {
   const navigate = useNavigate()
   const ev = useMemo(() => evaluate(design), [design])
   const outlook = useMemo(() => missionOutlook(design, launch?.extraCostM ?? 0), [design, launch])
-  /** 3, 2, 1 before liftoff; null when not counting */
-  const [count, setCount] = useState<number | null>(null)
+  /** The countdown in progress (3, 2, [HOLD], 1, Liftoff); null when not counting */
+  const [countdown, setCountdown] = useState<{ beats: Beat[]; i: number; outcome: LaunchOutcome } | null>(null)
+  const odds = useMemo(() => launchOdds(design), [design])
   /** The rolled result, shown only after the animation finishes */
   const [flight, setFlight] = useState<LaunchOutcome | null>(null)
   /** The full-screen 3D launch is open */
@@ -46,23 +56,39 @@ export default function LaunchPage() {
   const difficulty = design.planner.difficulty
 
   useEffect(() => {
-    if (count === null) return
+    if (!countdown) return
     const t = setTimeout(() => {
-      if (count === 1 && rocket && orbit) {
-        // Liftoff: decide what happens, then let the 3D scene play it
-        setFlight(rollLaunch(rocket, orbit, difficulty, Math.random(), Math.random()))
-      }
-      setCount(count > 0 ? count - 1 : null)
-    }, 800)
+      const next = countdown.i + 1
+      if (next >= countdown.beats.length) return setCountdown(null)
+      // Liftoff: the 3D scene plays what was rolled
+      if (countdown.beats[next].liftoff) setFlight(countdown.outcome)
+      setCountdown({ ...countdown, i: next })
+    }, countdown.beats[countdown.i].ms)
     return () => clearTimeout(t)
-  }, [count, rocket, orbit, difficulty])
+  }, [countdown])
+
+  /** Roll what happens now, so the countdown can show a HOLD before liftoff */
+  const startLaunch = () => {
+    const outcome = rollLaunch(design, Math.random(), Math.random())
+    const hold = holdLabel(outcome.kind)
+    const beats: Beat[] = [
+      { label: '3', ms: 800 },
+      { label: '2', ms: 800 },
+      ...(hold ? [{ label: 'HOLD', sub: hold.replace('HOLD · ', ''), ms: 2200, hold: true }] : []),
+      { label: '1', ms: 800 },
+      { label: 'Liftoff!', ms: 700, liftoff: true },
+    ]
+    setStageOpen(true)
+    setCountdown({ beats, i: 0, outcome })
+  }
+  const beat = countdown ? countdown.beats[countdown.i] : null
 
   if (!ev.designReady) return <Navigate to="/mission/design" replace />
 
   const blockers = ev.warnings.filter((w) => w.blocking).length
-  const busy = count !== null || (flight !== null && !launch)
+  const busy = countdown !== null || (flight !== null && !launch)
   const canLaunch = ev.launchReady && !launch && !busy
-  const sceneTone = flight?.tone ?? launch?.tone ?? 'good'
+  const sceneKind = flight?.kind ?? launch?.kind ?? null
 
   const tryAgain = () => {
     setFlight(null)
@@ -142,16 +168,18 @@ export default function LaunchPage() {
                       <OptionCard
                         name={r.name}
                         selected={design.comms.launchVehicleId === r.id}
-                        disabled={!orbit || !reaches || busy || Boolean(launch)}
-                        note={orbit && !reaches ? `Can’t reach ${orbit.name}.` : undefined}
+                        disabled={!orbit || busy || Boolean(launch)}
                         onSelect={() => setRocket(r.id)}
                         badge={
-                          orbit &&
-                          reaches && (
+                          orbit && (
                             <span
                               className={`rounded-full px-2 py-0.5 text-[11px] ${fits ? 'bg-emerald-400/15 text-emerald-200' : 'bg-rose-400/15 text-rose-200'}`}
                             >
-                              {fits ? `Fits: ${ev.massKg} of ${cap} kg` : `Too heavy: ${ev.massKg} kg > ${cap} kg`}
+                              {!reaches
+                                ? `Can’t reach ${orbit.name}`
+                                : fits
+                                  ? `Fits: ${ev.massKg} of ${cap} kg`
+                                  : `Too heavy: ${ev.massKg} kg > ${cap} kg`}
                             </span>
                           )
                         }
@@ -180,23 +208,29 @@ export default function LaunchPage() {
                 <LaunchReport launch={launch} outlook={outlook} onFly={() => navigate('/mission/operate')} onRetry={tryAgain} />
               ) : (
                 <>
-                  {ev.launchReady && <OutlookCard outlook={outlook} preview />}
+                  {ev.launchReady && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <OddsCard odds={odds} />
+                      <OutlookCard outlook={outlook} preview />
+                    </div>
+                  )}
                   <div className="mt-4 flex flex-wrap items-center gap-4">
                     <button
                       type="button"
                       disabled={!canLaunch}
-                      onClick={() => {
-                        setStageOpen(true)
-                        setCount(3)
-                      }}
+                      onClick={startLaunch}
                       className="glow-cyan min-h-16 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-10 text-xl font-bold text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:from-white/10 disabled:to-white/10 disabled:text-slate-400 disabled:shadow-none"
                     >
                       Launch <Rocket aria-hidden="true" className="ml-2 inline size-5" />
                     </button>
-                    {!ev.launchReady && (
+                    {!ev.launchReady ? (
                       <p className="text-sm text-slate-400">
-                        Fix the {blockers} “Must fix” item{blockers === 1 ? '' : 's'} on the dashboard first.
+                        Pick an orbit and a rocket first{blockers > 2 ? '' : ' (see the dashboard)'}.
                       </p>
+                    ) : (
+                      odds.chance < 0.5 && (
+                        <p className="text-sm text-amber-200">You can launch anyway, but the odds are against you.</p>
+                      )
                     )}
                   </div>
                 </>
@@ -229,14 +263,21 @@ export default function LaunchPage() {
             aria-label="Launch"
           >
             <Suspense fallback={<div className="flex h-full items-center justify-center text-slate-400">Rolling out to the pad…</div>}>
-              <LaunchScene rocketId={rocket.id} design={design} tone={sceneTone} flying={flight !== null} onDone={() => flight && setLaunch(flight)} />
+              <LaunchScene
+                rocketId={rocket.id}
+                design={design}
+                kind={sceneKind}
+                roughness={odds.roughness}
+                flying={flight !== null}
+                onDone={() => flight && setLaunch(flight)}
+              />
             </Suspense>
 
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-gradient-to-b from-black/70 to-transparent p-4">
               <p className="text-sm text-white">
                 <span className="block font-semibold">{rocket.name}</span>
                 <span className="text-slate-300">
-                  To {orbit.name} · {pct(1 - failureChance(rocket, difficulty))} reliable
+                  To {orbit.name} · {pct(odds.chance)} chance of success
                 </span>
               </p>
               <button
@@ -255,25 +296,32 @@ export default function LaunchPage() {
               </button>
             </div>
 
-            {!launch && count === null && !busy && (
+            {!launch && !busy && (
               <p className="pointer-events-none absolute bottom-24 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/45 px-3 py-1 text-xs text-slate-100 backdrop-blur">
                 <Rotate3d aria-hidden="true" className="size-3.5" /> Hold and drag to look around · pinch to zoom
               </p>
             )}
 
             <AnimatePresence>
-              {count !== null && (
-                <motion.p
-                  key={count}
+              {beat && (
+                <motion.div
+                  key={`${countdown?.i}-${beat.label}`}
                   initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
+                  animate={beat.hold ? { scale: [1, 1.06, 1], opacity: 1 } : { scale: 1, opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3, ease: EASE_OUT }}
+                  transition={beat.hold ? { duration: 0.8, repeat: Infinity } : { duration: 0.3, ease: EASE_OUT }}
                   role="status"
-                  className="pointer-events-none absolute inset-0 flex items-center justify-center font-display text-8xl font-bold tabular-nums text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.9)] sm:text-9xl"
+                  className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center drop-shadow-[0_2px_16px_rgba(0,0,0,0.9)]"
                 >
-                  {count > 0 ? count : 'Liftoff!'}
-                </motion.p>
+                  <span className={`font-display font-bold tabular-nums ${beat.hold ? 'text-7xl text-amber-300 sm:text-8xl' : 'text-8xl text-white sm:text-9xl'}`}>
+                    {beat.label}
+                  </span>
+                  {beat.sub && (
+                    <span className="mt-2 flex items-center gap-2 rounded-full bg-black/60 px-4 py-1.5 text-base font-semibold text-amber-200">
+                      <TriangleAlert aria-hidden="true" className="size-4" /> {beat.sub}
+                    </span>
+                  )}
+                </motion.div>
               )}
             </AnimatePresence>
 
@@ -322,7 +370,7 @@ function LaunchReport({
     <div className={`card p-5 sm:p-6 ${border} ${solid ? 'bg-space-900/95 backdrop-blur-md' : ''}`}>
       <p className="text-sm font-semibold uppercase tracking-wider text-cyan-300">Launch report</p>
       <h3 className="mt-1 text-2xl font-bold">
-        <ToneIcon tone={launch.tone} />
+        <ToneIcon launch={launch} />
         {launch.title}
       </h3>
       <p className="mt-2 text-slate-300">{launch.text}</p>
@@ -360,14 +408,52 @@ function LaunchReport({
   )
 }
 
+interface Beat {
+  label: string
+  sub?: string
+  ms: number
+  hold?: boolean
+  liftoff?: boolean
+}
+
+/** Big chance-of-success number with what it depends on */
+function OddsCard({ odds }: { odds: LaunchOdds }) {
+  const color = odds.chance >= 0.9 ? 'text-emerald-300' : odds.chance >= 0.5 ? 'text-amber-300' : 'text-rose-300'
+  return (
+    <div className="card p-5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Chance of success</p>
+      <p className={`mt-1 font-display text-5xl font-bold tabular-nums ${color}`}>{pct(odds.chance)}</p>
+      <ul className="mt-3 space-y-2.5 text-sm">
+        {odds.factors.map((f) => (
+          <li key={f.label}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold">{f.label}</span>
+              <span className="tabular-nums text-slate-300">{pct(f.chance)}</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full ${f.chance >= 0.9 ? 'bg-emerald-400' : f.chance >= 0.5 ? 'bg-amber-300' : 'bg-rose-400'}`}
+                style={{ width: `${Math.max(2, f.chance * 100)}%` }}
+              />
+            </div>
+            <p className="mt-1 text-xs text-slate-400">{f.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 const VERDICT: Record<string, { icon: LucideIcon; className: string }> = {
   likely: { icon: CircleCheck, className: 'text-emerald-200' },
   'at-risk': { icon: TriangleAlert, className: 'text-amber-200' },
   unlikely: { icon: CircleX, className: 'text-rose-200' },
 }
 
-function ToneIcon({ tone }: { tone: LaunchOutcome['tone'] }) {
-  const Icon = tone === 'good' ? Rocket : tone === 'bad' ? TriangleAlert : Flame
+function ToneIcon({ launch }: { launch: LaunchOutcome }) {
+  const { tone, kind } = launch
+  const Icon =
+    kind === 'lost-signal' ? WifiOff : kind === 'wrong-orbit' ? Orbit : tone === 'good' ? Rocket : tone === 'bad' ? TriangleAlert : Flame
   const color = tone === 'good' ? 'text-emerald-300' : tone === 'bad' ? 'text-amber-300' : 'text-rose-400'
   return <Icon aria-hidden="true" className={`mr-2 inline size-6 -translate-y-0.5 ${color}`} />
 }

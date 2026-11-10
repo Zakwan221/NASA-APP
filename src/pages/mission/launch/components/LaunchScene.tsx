@@ -23,6 +23,7 @@ import {
 } from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import ErrorBoundary from '../../../../components/ui/ErrorBoundary'
+import type { LaunchKind } from '../../../../game/engine/launch'
 import type { MissionDesign } from '../../../../game/types'
 import CraftModel from '../../design/components/CraftModel'
 import { Earth, Reflections, Sun } from '../../design/components/SpaceBackdrop'
@@ -30,7 +31,6 @@ import { concreteTexture, glowTexture, groundTexture, smokeTexture } from '../..
 import { useOnScreen } from '../../design/components/useOnScreen'
 import { useShadows } from '../../design/components/useShadows'
 
-export type FlightTone = 'good' | 'bad' | 'fail'
 
 interface RocketLook {
   height: number
@@ -50,15 +50,40 @@ const LOOK: Record<string, RocketLook> = {
   'deep-rideshare': { height: 4.6, radius: 0.32, body: '#ea7a1a', band: '#9a4a0c', stripe: '#f8fafc', boosters: true, boosterColor: '#f8fafc' },
 }
 
-/** How long each ending plays before onDone (seconds) */
-const DURATION: Record<FlightTone, number> = { good: 8, bad: 8, fail: 5 }
+/** How long each result plays before onDone (seconds) */
+const DURATION: Record<LaunchKind, number> = {
+  perfect: 8,
+  weather: 8,
+  hold: 8,
+  cable: 8,
+  explode: 5,
+  underpowered: 6.8,
+  'wrong-orbit': 9,
+  'lost-signal': 10,
+}
 const SEPARATION_AT = 3.4
 const FAIRING_AT = 4.4
 const BREAKUP_AT = 2.7
+/** Signal lost / wrong orbit: trouble starts after the spacecraft is out */
+const TROUBLE_AT = FAIRING_AT + 2.6
 const CLIMB = 0.42
 
 const climbY = (t: number) => t * t * CLIMB
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
+
+/* Too heavy: a slow, struggling climb, engines cut out, the rocket falls back */
+const CUT_AT = 3.2
+const UNDER_ACCEL = 0.12
+const UNDER_GRAVITY = 1.2
+const cutY = UNDER_ACCEL * CUT_AT * CUT_AT
+const cutV = 2 * UNDER_ACCEL * CUT_AT
+/** When the falling rocket hits the ground */
+const IMPACT_AT = CUT_AT + (cutV + Math.sqrt(cutV * cutV + 4 * UNDER_GRAVITY * cutY)) / (2 * UNDER_GRAVITY)
+function underpoweredPath(t: number) {
+  if (t < CUT_AT) return { y: UNDER_ACCEL * t * t, x: 0, tilt: Math.sin(t * 3) * 0.04 }
+  const k = Math.min(t, IMPACT_AT) - CUT_AT
+  return { y: Math.max(0, cutY + cutV * k - UNDER_GRAVITY * k * k), x: 0.5 * k * k, tilt: -k * 0.9 }
+}
 
 /* ---------------- sky: blue gradient that fades to black space ---------------- */
 
@@ -354,7 +379,7 @@ function Explosion({ boomRef, look }: { boomRef: RefObject<Group | null>; look: 
 
 /* ---------------- scene ---------------- */
 
-function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
+function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps) {
   const look = LOOK[rocketId] ?? LOOK['rideshare-leo']
   const lowerH = look.height * 0.7
   const upperH = look.height * 0.3
@@ -370,6 +395,8 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
   const engineLight = useRef<PointLight>(null)
   const boom = useRef<Group>(null)
   const boomLight = useRef<PointLight>(null)
+  const boomAt = useRef<Group>(null)
+  const beacon = useRef<Sprite>(null)
   const sky = useRef<ShaderMaterial>(null)
   const ground = useRef<Group>(null)
   const earth = useRef<Group>(null)
@@ -393,69 +420,104 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
     finished.current = false
   }, [flying, clock])
 
+
   const breakupY = climbY(BREAKUP_AT) + look.height * 0.6
+  const impact = underpoweredPath(IMPACT_AT)
 
   useFrame(({ clock: c }) => {
-    const t = startedAt.current === null ? 0 : Math.min(DURATION[tone] + 0.1, c.getElapsedTime() - startedAt.current)
-    const flicker = 0.85 + Math.random() * 0.3
+    const k0 = kind ?? 'perfect'
+    const t = startedAt.current === null ? 0 : Math.min(DURATION[k0] + 0.1, c.getElapsedTime() - startedAt.current)
+    // Less reliable launches flicker, shake and wobble more
+    const flicker = 0.85 + Math.random() * (0.3 + roughness * 0.5)
     const r = rocket.current
     if (!r) return
-    const failed = tone === 'fail'
-    const broken = flying && failed && t > BREAKUP_AT
+    const exploded = flying && k0 === 'explode' && t > BREAKUP_AT
+    const crashed = flying && k0 === 'underpowered' && t > IMPACT_AT
+    const destroyed = k0 === 'explode' || k0 === 'underpowered'
+    const boomT = k0 === 'explode' ? BREAKUP_AT : IMPACT_AT
+    const broken = exploded || crashed
 
-    // Climb: speeds up like a real rocket
-    const y = flying ? climbY(failed ? Math.min(t, BREAKUP_AT) : t) : 0
-    r.position.y = y + 0.2
+    // ---- where the rocket is ----
+    let y = 0
+    let x = 0
+    let tilt = 0
+    if (flying) {
+      if (k0 === 'underpowered') {
+        const p = underpoweredPath(t)
+        y = p.y
+        x = p.x
+        tilt = p.tilt
+      } else if (k0 === 'explode') {
+        y = climbY(Math.min(t, BREAKUP_AT))
+        tilt = t > BREAKUP_AT - 0.7 ? -(t - (BREAKUP_AT - 0.7)) * 0.55 : 0
+      } else {
+        y = climbY(t)
+        // A rough ride wobbles while the main engines burn
+        if (t < SEPARATION_AT) tilt = Math.sin(t * 9) * 0.05 * roughness + Math.sin(t * 2.3) * 0.02 * roughness
+      }
+    }
+    r.position.set(x, y + 0.2, 0)
+    r.rotation.z = tilt
+    r.visible = !broken
 
-    // Sky fades to black space; the ground drops away
-    const space = failed ? 0 : clamp01((t - 1.4) / 3)
+    // ---- sky and ground ----
+    const space = destroyed ? 0 : clamp01((t - 1.4) / 3)
     if (sky.current) sky.current.uniforms.uSpace.value = space
     if (ground.current) ground.current.visible = space < 0.98
 
-    // Main engines
-    burning.current = flying && t < SEPARATION_AT && !broken
+    // ---- main engines ----
+    const burnUntil = k0 === 'underpowered' ? CUT_AT : SEPARATION_AT
+    // Too heavy: the engines sputter as they strain
+    const sputter = k0 === 'underpowered' && t > 1.2 ? Math.random() > 0.35 : true
+    burning.current = flying && t < burnUntil && !broken && sputter
     if (flame.current) {
       flame.current.visible = burning.current
-      flame.current.scale.set(flicker, flicker * (1 + Math.min(t, 3) * 0.25), flicker)
+      const boost = k0 === 'underpowered' ? 0.7 : 1 + Math.min(t, 3) * 0.25
+      flame.current.scale.set(flicker, flicker * boost, flicker)
     }
     if (engineLight.current) engineLight.current.intensity = burning.current ? 25 * flicker : 0
 
-    if (failed) {
-      // Tilt, then break apart in a fireball
-      r.rotation.z = flying && t > BREAKUP_AT - 0.7 ? (t - (BREAKUP_AT - 0.7)) * 0.55 : 0
-      r.visible = !broken
-      const k = t - BREAKUP_AT
-      if (boom.current) {
-        boom.current.visible = broken
+    // ---- explosion (in the air, or on the ground after falling back) ----
+    const k = t - boomT
+    if (boomAt.current) boomAt.current.position.set(k0 === 'explode' ? 0.3 : impact.x, k0 === 'explode' ? breakupY : 0.6, 0)
+    if (boom.current) {
+      boom.current.visible = broken
+      if (broken) {
         boom.current.children.forEach((o) => {
-          const { kind, i } = o.userData as { kind: string; i: number }
+          const { kind: part, i } = o.userData as { kind: string; i: number }
           const a = i * 2.4
-          const spread = kind === 'debris' ? 1.6 : kind === 'fire' ? 0.9 : 1.2
+          const spread = part === 'debris' ? 1.6 : part === 'fire' ? 0.9 : 1.2
+          const ground = k0 === 'underpowered'
           o.position.set(
             Math.cos(a) * k * spread,
-            Math.sin(a * 1.3) * k * spread * 0.8 - (kind === 'debris' ? k * k * 0.7 : -k * 0.3),
+            ground ? Math.abs(Math.sin(a * 1.3)) * k * spread * 0.9 + (part === 'debris' ? -k * k * 0.9 : k * 0.4) : Math.sin(a * 1.3) * k * spread * 0.8 - (part === 'debris' ? k * k * 0.7 : -k * 0.3),
             Math.sin(a) * k * spread * 0.6,
           )
-          if (kind === 'debris') o.rotation.set(k * 5 + i, k * 4, 0)
+          if (ground && o.position.y < -0.4) o.position.y = -0.4
+          if (part === 'debris') o.rotation.set(k * 5 + i, k * 4, 0)
           else {
-            const s = o as Sprite
-            const m = s.material as SpriteMaterial
-            s.scale.setScalar(kind === 'fire' ? 0.6 + k * 2.6 : 0.8 + k * 3)
-            m.opacity = kind === 'fire' ? clamp01(1 - k / 1.2) : clamp01(Math.min(k * 2, 1) * (1 - k / 2.4)) * 0.85
+            const sp = o as Sprite
+            const m = sp.material as SpriteMaterial
+            sp.scale.setScalar(part === 'fire' ? 0.6 + k * 2.6 : 0.8 + k * 3)
+            m.opacity = part === 'fire' ? clamp01(1 - k / 1.2) : clamp01(Math.min(k * 2, 1) * (1 - k / 2.6)) * 0.85
           }
         })
       }
-      if (boomLight.current) boomLight.current.intensity = broken ? 60 * clamp01(1 - k / 1.3) : 0
-    } else {
+    }
+    if (boomLight.current) boomLight.current.intensity = broken ? 60 * clamp01(1 - k / 1.3) : 0
+
+    if (!destroyed) {
       // Stage separation: the first stage falls away
       if (lower.current) {
-        const k = flying ? t - SEPARATION_AT : -1
-        lower.current.position.y = k > 0 ? -k * k * 0.9 - k * 0.6 : 0
-        lower.current.rotation.z = k > 0 ? k * 0.35 : 0
-        lower.current.visible = k < 3
+        const ks = flying ? t - SEPARATION_AT : -1
+        lower.current.position.y = ks > 0 ? -ks * ks * 0.9 - ks * 0.6 : 0
+        lower.current.rotation.z = ks > 0 ? ks * 0.35 : 0
+        lower.current.visible = ks < 3
       }
       if (upperFlame.current) {
-        upperFlame.current.visible = flying && t > SEPARATION_AT + 0.3 && t < FAIRING_AT
+        // Wrong orbit: the upper stage burns only briefly (not enough to climb higher)
+        const upperEnd = k0 === 'wrong-orbit' ? SEPARATION_AT + 0.6 : FAIRING_AT
+        upperFlame.current.visible = flying && t > SEPARATION_AT + 0.3 && t < upperEnd
         upperFlame.current.scale.setScalar(flicker * 0.55)
       }
       // Fairing opens, the spacecraft drifts out and turns
@@ -468,25 +530,38 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
       }
       if (craft.current) {
         const out = flying ? clamp01((t - FAIRING_AT - 0.5) / 2) : 0
-        craft.current.position.y = upperH * 0.55 + out * 1.6
+        const trouble = flying && (k0 === 'lost-signal' || k0 === 'wrong-orbit') ? Math.max(0, t - TROUBLE_AT) : 0
+        craft.current.position.set(trouble * 0.25, upperH * 0.55 + out * 1.6 - (k0 === 'wrong-orbit' ? trouble * 0.35 : 0), 0)
         craft.current.scale.setScalar(look.radius * 0.6 + out * 0.4)
-        craft.current.rotation.y = t * 0.8
+        craft.current.rotation.set(trouble * 1.6, t * 0.8 + trouble * 1.1, trouble * 0.9)
+      }
+      // Signal lost: a red warning light blinks on the silent spacecraft
+      if (beacon.current) {
+        const on = flying && k0 === 'lost-signal' && t > TROUBLE_AT && Math.sin(t * 9) > 0
+        beacon.current.visible = on
       }
     }
 
-    // Earth below once in space
+    // ---- Earth below once in space (much closer in the wrong, too-low orbit) ----
     if (earth.current) {
       earth.current.visible = space > 0.3
-      earth.current.position.set(0, y - 30, -6)
+      const trouble = k0 === 'wrong-orbit' ? clamp01((t - TROUBLE_AT + 2) / 3) : 0
+      earth.current.position.set(0, y - 30 + trouble * 9, -6)
     }
 
     // Camera follows the rocket. The player can hold and drag to orbit around it
     // (OrbitControls); we only move the view along with the rocket and, while
     // they're not dragging, ease it to a distance that fits the scene.
-    const focusY = failed ? Math.min(y, climbY(BREAKUP_AT)) + look.height * 0.55 : y + look.height * 0.55
-    const dist = (7.8 + clamp01(t / 4) * 1.8) * portrait
-    const shake = burning.current && t < 2.5 ? (2.5 - t) * 0.02 : 0
-    focus.set((Math.random() - 0.5) * shake, focusY + (Math.random() - 0.5) * shake, 0)
+    const focusY =
+      k0 === 'explode'
+        ? Math.min(y, climbY(BREAKUP_AT)) + look.height * 0.55
+        : k0 === 'underpowered'
+          ? Math.max(1.6, y + look.height * 0.45)
+          : y + look.height * 0.55
+    const dist = (7.8 + (destroyed ? 0 : clamp01(t / 4) * 1.8)) * portrait
+    const shakeBase = burning.current && t < 2.5 ? (2.5 - t) * (0.02 + roughness * 0.05) : 0
+    const shake = shakeBase + (broken && k < 0.6 ? (0.6 - k) * 0.3 : 0)
+    focus.set(x * 0.6 + (Math.random() - 0.5) * shake, focusY + (Math.random() - 0.5) * shake, 0)
     const ctl = controls.current
     if (!placed.current) {
       camera.position.set(dist * 0.45, focusY + 0.4, dist)
@@ -502,7 +577,7 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
       camera.lookAt(focus)
     }
 
-    if (flying && !finished.current && t > DURATION[tone]) {
+    if (flying && !finished.current && t > DURATION[k0]) {
       finished.current = true
       onDone()
     }
@@ -612,6 +687,9 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
           {/* The spacecraft inside the fairing */}
           <group ref={craft} position={[0, upperH * 0.55, 0]}>
             <CraftModel design={design} />
+            <sprite ref={beacon} position={[0, 1, 0]} scale={1.4} visible={false}>
+              <spriteMaterial map={glowTexture()} color="#ff3b3b" transparent blending={AdditiveBlending} depthWrite={false} />
+            </sprite>
           </group>
 
           {/* Fairing halves (right half: angles 0..π, left half: π..2π), hinged at the bottom */}
@@ -637,8 +715,8 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
 
       </group>
 
-      {/* Explosion at the break-up point */}
-      <group position={[0.3, breakupY, 0]}>
+      {/* Explosion: in the air, or where the falling rocket hits the ground */}
+      <group ref={boomAt}>
         <Explosion boomRef={boom} look={look} />
         <pointLight ref={boomLight} color="#ff8a1f" distance={14} intensity={0} />
       </group>
@@ -649,7 +727,10 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
 interface SceneProps {
   rocketId: string
   design: MissionDesign
-  tone: FlightTone
+  /** What happens on this launch (null while waiting on the pad) */
+  kind: LaunchKind | null
+  /** 0..1 how rough the ride looks; from the chance of success */
+  roughness: number
   /** true starts the flight animation */
   flying: boolean
   onDone: () => void
