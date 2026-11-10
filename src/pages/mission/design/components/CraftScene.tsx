@@ -1,26 +1,42 @@
-import { OrbitControls, Stars } from '@react-three/drei'
+import { Float, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useRef, type ReactNode } from 'react'
-import type { Group } from 'three'
+import { useRef } from 'react'
 import ErrorBoundary from '../../../../components/ui/ErrorBoundary'
 import type { MissionDesign } from '../../../../game/types'
 import CraftModel from './CraftModel'
+import SpaceBackdrop from './SpaceBackdrop'
 import { useOnScreen } from './useOnScreen'
 
-/** Slow spin, used instead of OrbitControls on touch screens */
-function Spin({ children }: { children: ReactNode }) {
-  const ref = useRef<Group>(null)
-  useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.y += delta * 0.4
+/** Glides the camera to the given distance (works together with OrbitControls) */
+function CameraDistance({ distance }: { distance: number }) {
+  useFrame(({ camera }, delta) => {
+    const len = camera.position.length()
+    if (Math.abs(len - distance) > 0.01) camera.position.setLength(len + (distance - len) * Math.min(1, delta * 3))
   })
-  return <group ref={ref}>{children}</group>
+  return null
 }
 
-/** Rotatable 3D view of the spacecraft being designed. Lazy-loaded (three.js is big). */
-export default function CraftScene({ design, interactive = true }: { design: MissionDesign; interactive?: boolean }) {
+/**
+ * The spacecraft floating above Earth. Lazy-loaded (three.js is big).
+ * `interactive` adds mouse/finger rotation; turn it off where the page must scroll.
+ */
+export default function CraftScene({
+  design,
+  interactive = true,
+  zoom = 1,
+}: {
+  design: MissionDesign
+  interactive?: boolean
+  /** >1 moves the camera closer */
+  zoom?: number
+}) {
   const wrapper = useRef<HTMLDivElement>(null)
   const visible = useOnScreen(wrapper)
-  const big = design.engineer.structureId === 'bus-micro' || design.comms.radioId === 'deep-transponder'
+  // Pull the camera back for wide spacecraft so the solar wings stay in view
+  const wings = { 'solar-deploy': 1.45, 'solar-large': 2.1 }[design.engineer.solarId ?? ''] ?? 1
+  const body = design.engineer.structureId === 'bus-micro' ? 1.4 : 1
+  const dish = design.comms.radioId === 'deep-transponder' ? 1.2 : 1
+  const d = (Math.max(wings, body, dish) * 1.1) / zoom
 
   return (
     <div ref={wrapper} className="h-full w-full">
@@ -30,24 +46,26 @@ export default function CraftScene({ design, interactive = true }: { design: Mis
         <Canvas
           dpr={[1, 1.5]}
           frameloop={visible ? 'always' : 'never'}
-          camera={{ position: big ? [3.4, 1.9, 4] : [2.3, 1.3, 2.8], fov: 40 }}
-          gl={{ antialias: true, alpha: true, powerPreference: 'low-power' }}
+          camera={{ position: [2.4 * d, 1.2 * d, 3 * d], fov: 42 }}
+          gl={{ antialias: true, powerPreference: 'low-power' }}
         >
-          <ambientLight intensity={0.55} />
-          <directionalLight position={[5, 4, 3]} intensity={2.2} />
-          <directionalLight position={[-4, -2, -3]} intensity={0.4} color="#8b5cf6" />
-          <Stars radius={40} depth={20} count={600} factor={2} fade speed={0.5} />
-          <group rotation={[0.25, 0, 0]}>
-            {interactive ? (
+          <SpaceBackdrop />
+          <CameraDistance distance={Math.hypot(2.4, 1.2, 3) * d} />
+          <Float speed={1.2} rotationIntensity={0.25} floatIntensity={0.4}>
+            <group rotation={[0.2, 0, 0]}>
               <CraftModel design={design} />
-            ) : (
-              <Spin>
-                <CraftModel design={design} />
-              </Spin>
-            )}
-          </group>
-          {/* OrbitControls blocks page scrolling on touch, so only with a mouse */}
-          {interactive && <OrbitControls enablePan={false} enableZoom={false} autoRotate autoRotateSpeed={1.2} />}
+            </group>
+          </Float>
+          {interactive && (
+            <OrbitControls
+              enablePan={false}
+              enableZoom={false}
+              autoRotate
+              autoRotateSpeed={0.9}
+              minPolarAngle={0.6}
+              maxPolarAngle={2.2}
+            />
+          )}
         </Canvas>
       </ErrorBoundary>
     </div>

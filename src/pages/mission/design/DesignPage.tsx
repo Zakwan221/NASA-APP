@@ -1,21 +1,19 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { INSTRUMENTS, partById, partsIn, SCENARIOS } from '../../../game/data'
+import { motion } from 'framer-motion'
+import { useEffect, useMemo } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { SCENARIOS } from '../../../game/data'
 import { evaluate, limitsFor } from '../../../game/engine/evaluate'
-import type { Difficulty, MissionDesign, Part, PartCategory, ResourceKey } from '../../../game/types'
+import type { Difficulty, ResourceKey } from '../../../game/types'
 import { useMission } from '../../../store/missionStore'
-import AssemblyBay from './components/AssemblyBay'
-import Dashboard, { MiniStatus } from './components/Dashboard'
-import { DndProvider, type DragItem } from './components/dnd'
-import OptionCard, { CardRow, CardSlot } from './components/OptionCard'
+import Builder from './Builder'
+import { BUILD_STEPS } from './buildSteps'
 import PhaseSteps from './components/PhaseSteps'
-import { useMediaQuery } from './components/useMediaQuery'
 
-const DIFFICULTIES: { id: Difficulty; label: string; text: string }[] = [
-  { id: 'cadet', label: 'Cadet', text: 'Simple parts, a big budget and hints.' },
-  { id: 'engineer', label: 'Engineer', text: 'All parts, a normal budget, a year in space.' },
-  { id: 'director', label: 'Director', text: 'Tight budget, longer mission, more trouble in flight.' },
-  { id: 'sandbox', label: 'Sandbox', text: 'No budget limit. Try anything.' },
+const DIFFICULTIES: { id: Difficulty; label: string; icon: string; text: string }[] = [
+  { id: 'cadet', label: 'Cadet', icon: '🧑‍🚀', text: 'Simple parts, a big budget, and rockets never fail.' },
+  { id: 'engineer', label: 'Engineer', icon: '🛠️', text: 'All parts, a normal budget, a year in space.' },
+  { id: 'director', label: 'Director', icon: '🎖️', text: 'Tight budget, longer mission, riskier launches.' },
+  { id: 'sandbox', label: 'Sandbox', icon: '🧪', text: 'No budget limit. Try anything.' },
 ]
 
 const RESOURCE_WORD: Record<ResourceKey, string> = {
@@ -27,55 +25,23 @@ const RESOURCE_WORD: Record<ResourceKey, string> = {
   lifetime: 'lifetime',
 }
 
-const SLOTS: { slot: keyof MissionDesign['engineer'] | 'radio'; category: PartCategory; title: string; hint: string }[] = [
-  { slot: 'structureId', category: 'structure', title: 'Frame', hint: 'Decides how much everything can weigh.' },
-  { slot: 'solarId', category: 'power', title: 'Solar panels', hint: 'Make power in sunlight.' },
-  { slot: 'batteryId', category: 'battery', title: 'Battery', hint: 'Keeps things running in Earth’s shadow.' },
-  { slot: 'computerId', category: 'computer', title: 'Flight computer', hint: 'Runs the spacecraft and stores data.' },
-  { slot: 'attitudeId', category: 'attitude', title: 'Attitude control', hint: 'Points the instruments.' },
-  { slot: 'radio', category: 'comms', title: 'Radio', hint: 'Sends data home. Further orbits need stronger radios.' },
-]
-
-const fmtStorage = (mbit: number) => (mbit >= 8000 ? `${Math.round(mbit / 8000)} GB` : `${Math.round(mbit / 8)} MB`)
-const fmtRange = (km: number) =>
-  km >= 100_000_000 ? 'Deep space' : km >= 1_000_000 ? `${(km / 1_000_000).toFixed(1)}M km` : `${km.toLocaleString()} km`
-const fmtRate = (kbps: number) => (kbps >= 1000 ? `${kbps / 1000} Mbps` : `${kbps} kbps`)
-
-/** The numbers worth showing for each kind of part */
-function partStats(p: Part) {
-  const stats = [
-    { label: 'Mass', value: `${p.massKg} kg` },
-    { label: 'Cost', value: `$${p.costM} M` },
-  ]
-  if (p.powerDrawW) stats.push({ label: 'Uses', value: `${p.powerDrawW} W` })
-  if (p.maxLoadKg) stats.push({ label: 'Carries', value: `${p.maxLoadKg} kg` })
-  if (p.powerGenW) stats.push({ label: 'Makes', value: `${p.powerGenW} W` })
-  if (p.capacityWh) stats.push({ label: 'Stores', value: `${p.capacityWh} Wh` })
-  if (p.storageMbit) stats.push({ label: 'Storage', value: fmtStorage(p.storageMbit) })
-  if (p.dataRateKbps) stats.push({ label: 'Speed', value: fmtRate(p.dataRateKbps) })
-  if (p.maxRangeKm) stats.push({ label: 'Range', value: fmtRange(p.maxRangeKm) })
-  if (p.pointingDeg !== undefined) stats.push({ label: 'Aims within', value: `${p.pointingDeg}°` })
-  return stats
+const SCENARIO_ART: Record<string, { icon: string; gradient: string }> = {
+  'earth-watch': { icon: '🌏', gradient: 'from-emerald-500/30 via-cyan-500/20 to-transparent' },
+  'solar-storm': { icon: '☀️', gradient: 'from-amber-500/35 via-orange-500/20 to-transparent' },
+  'asteroid-scout': { icon: '☄️', gradient: 'from-violet-500/35 via-fuchsia-500/20 to-transparent' },
 }
 
-function Step({ n, title, hint, children }: { n: number; title: string; hint: string; children: ReactNode }) {
-  return (
-    <section className="mt-10 first:mt-0">
-      <h2 className="text-xl font-bold">
-        <span className="text-cyan-300">{n}.</span> {title}
-      </h2>
-      <p className="mb-4 mt-1 text-sm text-slate-400">{hint}</p>
-      {children}
-    </section>
-  )
-}
-
-/** Phase 1: pick a mission, build the spacecraft, watch the live dashboard. */
+/**
+ * Phase 1. First a short mission briefing (mission, mode, lifetime), then
+ * "Start building" opens the full-screen 3D builder, one step at a time.
+ * The builder step lives in the URL (?build=2) so the phone's Back button works.
+ */
 export default function DesignPage() {
   const store = useMission()
   const { design } = store
   const navigate = useNavigate()
   const location = useLocation()
+  const [params, setParams] = useSearchParams()
   const ev = useMemo(() => evaluate(design), [design])
 
   // Coming from the Report's Redesign button: the next flight needs a new launch
@@ -84,276 +50,184 @@ export default function DesignPage() {
   useEffect(() => {
     if (redesign) setLaunch(null)
   }, [redesign, setLaunch])
+
   const scenarioId = design.planner.scenarioId
   const difficulty = design.planner.difficulty
-  const showAdvanced = difficulty !== 'cadet'
-  const visible = <T extends { tier: string }>(items: T[]) => items.filter((i) => showAdvanced || i.tier === 'simple')
   const limits = limitsFor(ev.scenario, difficulty)
   const lifetime = design.planner.targetLifetimeMonths
+  const buildParam = params.get('build')
+  const step = buildParam === null ? null : Math.min(BUILD_STEPS.length - 1, Math.max(0, Number(buildParam) || 0))
+  const started = Boolean(design.engineer.structureId)
 
-  const selectedId = (slot: (typeof SLOTS)[number]['slot']) =>
-    slot === 'radio' ? design.comms.radioId : design.engineer[slot]
-  const select = (slot: (typeof SLOTS)[number]['slot'], id: string) =>
-    slot === 'radio' ? store.setRadio(id) : store.setPart(slot, id)
-
-  const instruments = visible(INSTRUMENTS).sort(
-    (a, b) => Number(b.goodFor.includes(scenarioId ?? '')) - Number(a.goodFor.includes(scenarioId ?? '')),
-  )
-  const blockers = ev.warnings.filter((w) => w.blocking && w.phase === 'design').length
-  const wide = useMediaQuery('(min-width: 1024px)')
-
-  /** A part or instrument dropped on the 3D spacecraft goes into its slot */
-  const fit = (item: DragItem) => {
-    if (item.kind === 'instrument') {
-      if (!design.science.instrumentIds.includes(item.id)) store.toggleInstrument(item.id)
-      return
-    }
-    const slot = SLOTS.find((s) => s.category === partById(item.id)?.category)?.slot
-    if (slot) select(slot, item.id)
+  const goStep = (n: number) => setParams({ build: String(n) }, { replace: true })
+  const startBuilding = () => {
+    // Continue where the player stopped: the first step that still needs a choice
+    const first = BUILD_STEPS.findIndex((s) =>
+      s.slot
+        ? !(s.slot === 'radio' ? design.comms.radioId : design.engineer[s.slot])
+        : s.id === 'instruments'
+          ? design.science.instrumentIds.length === 0
+          : true,
+    )
+    setParams({ build: String(Math.max(0, first)) })
   }
-  const bay = (className: string) => (
-    <AssemblyBay design={design} massKg={ev.massKg} onFit={fit} interactive={wide} className={className} />
-  )
+
+  if (step !== null && scenarioId) {
+    return <Builder step={step} onStep={goStep} onExit={() => setParams({})} onFinish={() => navigate('/mission/launch')} />
+  }
 
   return (
-    <DndProvider>
-    <div className="mx-auto w-full max-w-6xl px-4 pb-32 pt-20 sm:px-6 sm:pt-24 lg:pb-16">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-20 sm:px-6 sm:pt-24">
       <header className="mb-8">
         <PhaseSteps current="Design" />
-        <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Design your spacecraft</h1>
+        <h1 className="mt-4 text-3xl font-bold sm:text-4xl">Mission briefing</h1>
         <p className="mt-2 max-w-2xl text-slate-300">
-          Every part adds mass, uses power and costs money. Watch the dashboard: it explains what each choice does.
+          Choose what your spacecraft will do and how hard the game should be. Then build it piece by piece in 3D.
         </p>
       </header>
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
-        <div className="min-w-0">
-          <Step n={1} title="Choose a mission" hint="What should your spacecraft do? This decides which instruments and orbits make sense.">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {SCENARIOS.map((s) => {
-                const selected = s.id === scenarioId
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => {
-                      store.setScenario(s.id)
-                      const min = limitsFor(s, difficulty).minLifetimeMonths
-                      if (lifetime < min) store.setLifetime(min)
-                    }}
-                    className={`card min-h-11 p-4 text-left transition active:scale-[0.98] ${
-                      selected ? 'border-cyan-300/70 bg-cyan-300/5' : 'hover:border-white/25'
-                    }`}
-                  >
-                    <span className="block font-semibold">{s.title}</span>
-                    <span className="mt-1 block text-sm text-slate-300">{s.objective}</span>
-                    <span className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-                      {s.criticalResources.map((r) => (
-                        <span key={r} className="rounded-full bg-amber-300/15 px-2 py-0.5 text-amber-200">
-                          Key: {RESOURCE_WORD[r]}
-                        </span>
-                      ))}
-                      {s.nasaData.map((d) => (
-                        <span key={d.api} className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">
-                          NASA {d.api}
-                        </span>
-                      ))}
+      <section aria-labelledby="mission-h">
+        <h2 id="mission-h" className="text-xl font-bold">
+          <span className="text-cyan-300">1.</span> Mission
+        </h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Mission">
+          {SCENARIOS.map((s) => {
+            const selected = s.id === scenarioId
+            const art = SCENARIO_ART[s.id] ?? SCENARIO_ART['earth-watch']
+            return (
+              <motion.button
+                key={s.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  store.setScenario(s.id)
+                  const min = limitsFor(s, difficulty).minLifetimeMonths
+                  if (lifetime < min) store.setLifetime(min)
+                }}
+                className={`card relative overflow-hidden p-5 text-left transition ${
+                  selected ? 'border-cyan-300/80 shadow-[0_0_24px_-6px_rgba(103,232,249,0.6)]' : 'hover:border-white/25'
+                }`}
+              >
+                <span aria-hidden="true" className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${art.gradient}`} />
+                <span className="relative block text-4xl" aria-hidden="true">
+                  {art.icon}
+                </span>
+                <span className="relative mt-3 block text-lg font-semibold">{s.title}</span>
+                <span className="relative mt-1 block text-sm text-slate-300">{s.objective}</span>
+                <span className="relative mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                  {s.criticalResources.map((r) => (
+                    <span key={r} className="rounded-full bg-amber-300/15 px-2 py-0.5 text-amber-200">
+                      Key: {RESOURCE_WORD[r]}
                     </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="mt-6 grid gap-6 sm:grid-cols-2">
-              <fieldset>
-                <legend className="mb-2 text-sm font-semibold">Difficulty</legend>
-                <div className="flex flex-wrap gap-2">
-                  {DIFFICULTIES.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      aria-pressed={difficulty === d.id}
-                      onClick={() => {
-                        store.setDifficulty(d.id)
-                        const min = limitsFor(ev.scenario, d.id).minLifetimeMonths
-                        if (lifetime < min) store.setLifetime(min)
-                      }}
-                      className={`min-h-11 rounded-full px-4 text-sm font-semibold transition ${
-                        difficulty === d.id ? 'bg-cyan-300 text-space-950' : 'bg-white/10 hover:bg-white/15'
-                      }`}
-                    >
-                      {d.label}
-                    </button>
                   ))}
-                </div>
-                <p className="mt-2 text-sm text-slate-400">
-                  {DIFFICULTIES.find((d) => d.id === difficulty)?.text}{' '}
-                  {ev.scenario && difficulty !== 'sandbox' && `Budget $${limits.budgetM} M.`}
-                </p>
-              </fieldset>
-
-              <fieldset>
-                <legend className="mb-2 text-sm font-semibold">Planned time in space</legend>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    aria-label="Fewer months"
-                    onClick={() => store.setLifetime(Math.max(limits.minLifetimeMonths, lifetime - 3))}
-                    disabled={lifetime <= limits.minLifetimeMonths}
-                    className="size-11 rounded-full bg-white/10 text-xl font-bold hover:bg-white/15 disabled:opacity-40"
-                  >
-                    −
-                  </button>
-                  <span className="min-w-28 text-center font-display text-2xl font-bold tabular-nums">{lifetime} months</span>
-                  <button
-                    type="button"
-                    aria-label="More months"
-                    onClick={() => store.setLifetime(Math.min(60, lifetime + 3))}
-                    disabled={lifetime >= 60}
-                    className="size-11 rounded-full bg-white/10 text-xl font-bold hover:bg-white/15 disabled:opacity-40"
-                  >
-                    +
-                  </button>
-                </div>
-                <p className="mt-2 text-sm text-slate-400">
-                  Longer missions return more science but cost more to run. At least {limits.minLifetimeMonths} months on this
-                  difficulty.
-                </p>
-              </fieldset>
-            </div>
-          </Step>
-
-          <div>
-          {!wide && <div className="sticky top-16 z-20 -mx-4 mb-2 bg-space-950/90 px-4 pb-2 pt-2 backdrop-blur">{bay('h-44')}</div>}
-          <Step n={2} title="Build the spacecraft" hint="Tap a card, or drag it onto the spacecraft. Swipe sideways on a phone to see every option.">
-            <div className="space-y-6">
-              {SLOTS.map(({ slot, category, title, hint }) => (
-                <div key={slot} role="radiogroup" aria-label={title}>
-                  <h3 className="font-semibold">
-                    {title} <span className="text-sm font-normal text-slate-400">· {hint}</span>
-                  </h3>
-                  <div className="mt-2">
-                    <CardRow>
-                      {visible(partsIn(category)).map((p) => (
-                        <CardSlot key={p.id}>
-                          <OptionCard
-                            name={p.name}
-                            selected={selectedId(slot) === p.id}
-                            onSelect={() => select(slot, p.id)}
-                            stats={partStats(p)}
-                            dragItem={{ kind: 'part', id: p.id, name: p.name }}
-                            explain={p.explain}
-                            source={p.source}
-                            badge={
-                              p.tier === 'advanced' && (
-                                <span className="rounded-full bg-violet-400/15 px-2 py-0.5 text-[11px] text-violet-200">Advanced</span>
-                              )
-                            }
-                          />
-                        </CardSlot>
-                      ))}
-                    </CardRow>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Step>
-
-          <Step n={3} title="Pick instruments" hint="More instruments mean more science, but also more mass, power, money and data.">
-            {!scenarioId && <p className="mb-3 text-sm text-amber-200">Choose a mission first to see which instruments fit it.</p>}
-            <CardRow>
-              {instruments.map((i) => {
-                const fits = scenarioId ? i.goodFor.includes(scenarioId) : false
-                return (
-                  <CardSlot key={i.id}>
-                    <OptionCard
-                      multi
-                      name={i.name}
-                      selected={design.science.instrumentIds.includes(i.id)}
-                      onSelect={() => store.toggleInstrument(i.id)}
-                      dragItem={{ kind: 'instrument', id: i.id, name: i.name }}
-                      stats={[
-                        { label: 'Mass', value: `${i.massKg} kg` },
-                        { label: 'Cost', value: `$${i.costM} M` },
-                        { label: 'Uses', value: `${i.powerDrawW} W` },
-                        { label: 'Data/day', value: `${(i.dataPerDayMbit / 1000).toFixed(1)} Gbit` },
-                        { label: 'Science', value: `${i.scienceValue}/day` },
-                        { label: 'Aim within', value: `${i.needsPointingDeg}°` },
-                      ]}
-                      explain={i.explain}
-                      source={i.source}
-                      badge={
-                        <span className="flex flex-wrap gap-1">
-                          {fits && <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] text-emerald-200">Fits this mission</span>}
-                          {i.tier === 'advanced' && (
-                            <span className="rounded-full bg-violet-400/15 px-2 py-0.5 text-[11px] text-violet-200">Advanced</span>
-                          )}
-                        </span>
-                      }
-                    />
-                  </CardSlot>
-                )
-              })}
-            </CardRow>
-          </Step>
-          </div>
-
-          <div className="mt-10 lg:hidden">
-            <Dashboard ev={ev} phase="design" anchorId="dashboard" />
-          </div>
-
-          <div className="mt-8 hidden flex-wrap items-center gap-4 lg:flex">
-            <NextButton ready={ev.designReady} onClick={() => navigate('/mission/launch')} />
-            <ResetButton onReset={store.reset} />
-            {!ev.designReady && <p className="text-sm text-slate-400">Fix the {blockers} “Must fix” item{blockers === 1 ? '' : 's'} first.</p>}
-          </div>
+                  {s.nasaData.map((d) => (
+                    <span key={d.api} className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">
+                      NASA {d.api}
+                    </span>
+                  ))}
+                </span>
+                {selected && (
+                  <span className="absolute right-3 top-3 rounded-full bg-cyan-300 px-2 py-0.5 text-xs font-bold text-space-950">✓ Chosen</span>
+                )}
+              </motion.button>
+            )
+          })}
         </div>
+      </section>
 
-        <aside className="hidden lg:block">
-          <div className="sticky top-20 max-h-[calc(100svh-6rem)] overflow-y-auto pb-4">
-            {wide && bay('mb-4 h-64')}
-            <Dashboard ev={ev} phase="design" />
-          </div>
-        </aside>
-      </div>
-
-      {/* Phone: always-visible status and Next */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-space-950/95 px-4 py-3 backdrop-blur lg:hidden">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <a href="#dashboard" className="min-w-0" aria-label="Show the full dashboard">
-            <MiniStatus ev={ev} />
-            <span className="mt-1 block text-xs text-slate-400">
-              {ev.designReady ? 'Ready for launch' : `${blockers} to fix · tap for why`}
-            </span>
-          </a>
-          <NextButton ready={ev.designReady} onClick={() => navigate('/mission/launch')} />
+      <section className="mt-10" aria-labelledby="mode-h">
+        <h2 id="mode-h" className="text-xl font-bold">
+          <span className="text-cyan-300">2.</span> Game mode
+        </h2>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4" role="radiogroup" aria-label="Game mode">
+          {DIFFICULTIES.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              role="radio"
+              aria-checked={difficulty === d.id}
+              onClick={() => {
+                store.setDifficulty(d.id)
+                const min = limitsFor(ev.scenario, d.id).minLifetimeMonths
+                if (lifetime < min) store.setLifetime(min)
+              }}
+              className={`card min-h-11 p-4 text-left transition active:scale-[0.98] ${
+                difficulty === d.id ? 'border-cyan-300/80 bg-cyan-300/10' : 'hover:border-white/25'
+              }`}
+            >
+              <span className="block text-2xl" aria-hidden="true">
+                {d.icon}
+              </span>
+              <span className="mt-1 block font-semibold">{d.label}</span>
+              <span className="mt-0.5 block text-xs text-slate-400">{d.text}</span>
+            </button>
+          ))}
         </div>
+      </section>
+
+      <section className="mt-10" aria-labelledby="time-h">
+        <h2 id="time-h" className="text-xl font-bold">
+          <span className="text-cyan-300">3.</span> Time in space
+        </h2>
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label="Fewer months"
+              onClick={() => store.setLifetime(Math.max(limits.minLifetimeMonths, lifetime - 3))}
+              disabled={lifetime <= limits.minLifetimeMonths}
+              className="size-11 rounded-full bg-white/10 text-xl font-bold hover:bg-white/15 disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="min-w-28 text-center font-display text-2xl font-bold tabular-nums">{lifetime} months</span>
+            <button
+              type="button"
+              aria-label="More months"
+              onClick={() => store.setLifetime(Math.min(60, lifetime + 3))}
+              disabled={lifetime >= 60}
+              className="size-11 rounded-full bg-white/10 text-xl font-bold hover:bg-white/15 disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+          <p className="max-w-md text-sm text-slate-400">
+            Longer missions return more science but cost more to run. At least {limits.minLifetimeMonths} months on this mode
+            {ev.scenario && difficulty !== 'sandbox' ? `, budget $${limits.budgetM} M.` : '.'}
+          </p>
+        </div>
+      </section>
+
+      <div className="mt-12 flex flex-wrap items-center gap-4">
+        <motion.button
+          type="button"
+          disabled={!scenarioId}
+          onClick={startBuilding}
+          whileTap={{ scale: 0.97 }}
+          className="glow-cyan min-h-16 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-10 text-xl font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:from-white/10 disabled:to-white/10 disabled:text-slate-400 disabled:shadow-none"
+        >
+          {started ? 'Continue building 🛠️' : 'Start building 🚀'}
+        </motion.button>
+        {!scenarioId && <p className="text-sm text-slate-400">Choose a mission first.</p>}
+        {started && (
+          <>
+            {ev.designReady && (
+              <button
+                type="button"
+                onClick={() => navigate('/mission/launch')}
+                className="min-h-12 rounded-full border border-white/20 px-6 font-semibold hover:bg-white/10"
+              >
+                Skip to launch →
+              </button>
+            )}
+            <button type="button" onClick={store.reset} className="min-h-11 text-sm font-semibold text-slate-400 hover:text-slate-200">
+              Start over
+            </button>
+          </>
+        )}
       </div>
     </div>
-    </DndProvider>
   )
 }
-
-function NextButton({ ready, onClick }: { ready: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!ready}
-      className="glow-cyan min-h-12 shrink-0 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none"
-    >
-      Next: Launch →
-    </button>
-  )
-}
-
-function ResetButton({ onReset }: { onReset: () => void }) {
-  return (
-    <button type="button" onClick={onReset} className="min-h-11 text-sm font-semibold text-slate-400 hover:text-slate-200">
-      Start over
-    </button>
-  )
-}
-
