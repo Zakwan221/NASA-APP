@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { Check, Earth, FlaskConical, GraduationCap, Medal, Orbit, Rocket, Sun, Wrench, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { SCENARIOS } from '../../../game/data'
@@ -9,11 +10,11 @@ import Builder from './Builder'
 import { BUILD_STEPS } from './buildSteps'
 import PhaseSteps from './components/PhaseSteps'
 
-const DIFFICULTIES: { id: Difficulty; label: string; icon: string; text: string }[] = [
-  { id: 'cadet', label: 'Cadet', icon: '🧑‍🚀', text: 'Simple parts, a big budget, and rockets never fail.' },
-  { id: 'engineer', label: 'Engineer', icon: '🛠️', text: 'All parts, a normal budget, a year in space.' },
-  { id: 'director', label: 'Director', icon: '🎖️', text: 'Tight budget, longer mission, riskier launches.' },
-  { id: 'sandbox', label: 'Sandbox', icon: '🧪', text: 'No budget limit. Try anything.' },
+const DIFFICULTIES: { id: Difficulty; label: string; icon: LucideIcon; text: string }[] = [
+  { id: 'cadet', label: 'Cadet', icon: GraduationCap, text: 'Simple parts, a big budget, and rockets never fail.' },
+  { id: 'engineer', label: 'Engineer', icon: Wrench, text: 'All parts, a normal budget, a year in space.' },
+  { id: 'director', label: 'Director', icon: Medal, text: 'Tight budget, longer mission, riskier launches.' },
+  { id: 'sandbox', label: 'Sandbox', icon: FlaskConical, text: 'No budget limit. Try anything.' },
 ]
 
 const RESOURCE_WORD: Record<ResourceKey, string> = {
@@ -25,10 +26,10 @@ const RESOURCE_WORD: Record<ResourceKey, string> = {
   lifetime: 'lifetime',
 }
 
-const SCENARIO_ART: Record<string, { icon: string; gradient: string }> = {
-  'earth-watch': { icon: '🌏', gradient: 'from-emerald-500/30 via-cyan-500/20 to-transparent' },
-  'solar-storm': { icon: '☀️', gradient: 'from-amber-500/35 via-orange-500/20 to-transparent' },
-  'asteroid-scout': { icon: '☄️', gradient: 'from-violet-500/35 via-fuchsia-500/20 to-transparent' },
+const SCENARIO_ART: Record<string, { icon: LucideIcon; color: string; gradient: string }> = {
+  'earth-watch': { icon: Earth, color: 'text-emerald-300', gradient: 'from-emerald-500/30 via-cyan-500/20 to-transparent' },
+  'solar-storm': { icon: Sun, color: 'text-amber-300', gradient: 'from-amber-500/35 via-orange-500/20 to-transparent' },
+  'asteroid-scout': { icon: Orbit, color: 'text-violet-300', gradient: 'from-violet-500/35 via-fuchsia-500/20 to-transparent' },
 }
 
 /**
@@ -111,9 +112,7 @@ export default function DesignPage() {
                 }`}
               >
                 <span aria-hidden="true" className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${art.gradient}`} />
-                <span className="relative block text-4xl" aria-hidden="true">
-                  {art.icon}
-                </span>
+                <art.icon aria-hidden="true" className={`relative size-10 ${art.color}`} strokeWidth={1.5} />
                 <span className="relative mt-3 block text-lg font-semibold">{s.title}</span>
                 <span className="relative mt-1 block text-sm text-slate-300">{s.objective}</span>
                 <span className="relative mt-3 flex flex-wrap gap-1.5 text-[11px]">
@@ -129,7 +128,9 @@ export default function DesignPage() {
                   ))}
                 </span>
                 {selected && (
-                  <span className="absolute right-3 top-3 rounded-full bg-cyan-300 px-2 py-0.5 text-xs font-bold text-space-950">✓ Chosen</span>
+                  <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-cyan-300 px-2 py-0.5 text-xs font-bold text-space-950">
+                    <Check aria-hidden="true" className="size-3" strokeWidth={3} /> Chosen
+                  </span>
                 )}
               </motion.button>
             )
@@ -157,9 +158,7 @@ export default function DesignPage() {
                 difficulty === d.id ? 'border-cyan-300/80 bg-cyan-300/10' : 'hover:border-white/25'
               }`}
             >
-              <span className="block text-2xl" aria-hidden="true">
-                {d.icon}
-              </span>
+              <d.icon aria-hidden="true" className="size-6 text-cyan-300" strokeWidth={1.75} />
               <span className="mt-1 block font-semibold">{d.label}</span>
               <span className="mt-0.5 block text-xs text-slate-400">{d.text}</span>
             </button>
@@ -208,7 +207,12 @@ export default function DesignPage() {
           whileTap={{ scale: 0.97 }}
           className="glow-cyan min-h-16 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-10 text-xl font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:from-white/10 disabled:to-white/10 disabled:text-slate-400 disabled:shadow-none"
         >
-          {started ? 'Continue building 🛠️' : 'Start building 🚀'}
+          {started ? 'Continue building' : 'Start building'}
+          {started ? (
+            <Wrench aria-hidden="true" className="ml-2 inline size-5" />
+          ) : (
+            <Rocket aria-hidden="true" className="ml-2 inline size-5" />
+          )}
         </motion.button>
         {!scenarioId && <p className="text-sm text-slate-400">Choose a mission first.</p>}
         {started && (

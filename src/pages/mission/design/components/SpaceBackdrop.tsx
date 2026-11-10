@@ -79,7 +79,21 @@ export default function SpaceBackdrop() {
       <color attach="background" args={['#02040c']} />
       <Reflections />
       <ambientLight intensity={0.25} />
-      <directionalLight position={[6, 4, 4]} intensity={3} color="#fff4dc" />
+      <directionalLight
+        position={[6, 4, 4]}
+        intensity={3}
+        color="#fff4dc"
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
+        shadow-camera-left={-3}
+        shadow-camera-right={3}
+        shadow-camera-top={3}
+        shadow-camera-bottom={-3}
+        shadow-camera-near={0.5}
+        shadow-camera-far={20}
+      />
       <directionalLight position={[0, -5, 0]} intensity={0.6} color="#38bdf8" />
       <Stars radius={60} depth={30} count={1500} factor={3} saturation={0.4} fade speed={0.4} />
       <Sun position={[14, 8, -18]} />

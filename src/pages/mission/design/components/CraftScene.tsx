@@ -44,6 +44,7 @@ export default function CraftScene({
         fallback={<p className="flex h-full items-center justify-center p-4 text-center text-sm text-slate-400">3D view isn’t available on this device.</p>}
       >
         <Canvas
+          shadows="soft"
           dpr={[1, 1.5]}
           frameloop={visible ? 'always' : 'never'}
           camera={{ position: [2.4 * d, 1.2 * d, 3 * d], fov: 42 }}

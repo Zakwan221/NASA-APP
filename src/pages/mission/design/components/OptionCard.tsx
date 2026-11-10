@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { DragHandle, type DragItem } from './dnd'
 
@@ -51,7 +52,7 @@ export default function OptionCard({
             multi ? 'rounded-md' : 'rounded-full'
           } ${selected ? 'border-cyan-300 bg-cyan-300 text-space-950' : 'border-white/30'}`}
         >
-          {selected ? '✓' : ''}
+          {selected && <Check className="size-3.5" strokeWidth={3} />}
         </span>
         <span className="flex-1">
           <span className="block font-semibold leading-snug">{name}</span>

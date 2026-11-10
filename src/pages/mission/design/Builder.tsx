@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronLeft, Rocket, Rotate3d } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { INSTRUMENTS, partById, partsIn } from '../../../game/data'
 import { evaluate } from '../../../game/engine/evaluate'
@@ -115,7 +116,8 @@ export default function Builder({
                 onClick={onExit}
                 className="pointer-events-auto min-h-11 rounded-full bg-white/10 px-4 text-sm font-semibold backdrop-blur hover:bg-white/15"
               >
-                ← Mission
+                <ChevronLeft aria-hidden="true" className="-ml-1 mr-1 inline size-4" />
+                Mission
               </button>
               <p className="text-right text-xs text-slate-300">
                 <span className="block font-semibold text-white">{ev.scenario?.title}</span>
@@ -138,7 +140,7 @@ export default function Builder({
                           : 'bg-white/10 hover:bg-white/20'
                     }`}
                   >
-                    <span aria-hidden="true">{s.icon}</span>
+                    <s.icon aria-hidden="true" className={`size-4 ${i === step ? 'text-space-950' : 'text-white'}`} />
                     <span className="sr-only">
                       {s.title} {stepDone(s) ? '(done)' : ''}
                     </span>
@@ -147,6 +149,9 @@ export default function Builder({
               ))}
             </ol>
           </div>
+          <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-xs text-slate-200 backdrop-blur">
+            <Rotate3d aria-hidden="true" className="size-3.5" /> Hold and drag to turn it
+          </p>
         </DropZone>
 
         {/* Choice panel: bottom sheet on phones, side panel on desktop */}
@@ -165,7 +170,7 @@ export default function Builder({
                   Step {step + 1} of {BUILD_STEPS.length}
                 </p>
                 <h2 className="mt-0.5 text-xl font-bold">
-                  <span aria-hidden="true">{current.icon} </span>
+                  <current.icon aria-hidden="true" className="mr-2 inline size-5 -translate-y-0.5 text-cyan-300" />
                   {current.title}
                 </h2>
                 <p className="mt-1 text-sm text-slate-400">
@@ -255,7 +260,13 @@ export default function Builder({
                   disabled={!canNext}
                   className="glow-cyan min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none"
                 >
-                  {canNext ? 'Go to launch 🚀' : `${blockers} to fix`}
+                  {canNext ? (
+                    <>
+                      Go to launch <Rocket aria-hidden="true" className="ml-1 inline size-4" />
+                    </>
+                  ) : (
+                    `${blockers} to fix`
+                  )}
                 </button>
               ) : (
                 <button

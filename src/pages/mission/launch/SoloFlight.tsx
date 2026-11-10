@@ -1,3 +1,4 @@
+import { Wrench } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { buildFlight } from '../../../game/engine/evaluate'
@@ -31,7 +32,7 @@ export default function SoloFlight() {
             state={{ redesign: true }}
             className="mt-4 inline-flex min-h-12 items-center rounded-full border border-cyan-300/50 px-6 font-semibold text-cyan-200 transition hover:bg-cyan-300/10"
           >
-            🔧 Redesign spacecraft
+            <Wrench aria-hidden="true" className="mr-2 size-4" /> Redesign spacecraft
           </Link>
         </div>
       }

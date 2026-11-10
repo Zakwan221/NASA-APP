@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { CircleCheck, CircleX, Flame, Rocket, Rotate3d, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ORBITS, ROCKETS } from '../../../game/data'
@@ -190,7 +191,7 @@ export default function LaunchPage() {
                       }}
                       className="glow-cyan min-h-16 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-10 text-xl font-bold text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:from-white/10 disabled:to-white/10 disabled:text-slate-400 disabled:shadow-none"
                     >
-                      Launch 🚀
+                      Launch <Rocket aria-hidden="true" className="ml-2 inline size-5" />
                     </button>
                     {!ev.launchReady && (
                       <p className="text-sm text-slate-400">
@@ -244,9 +245,21 @@ export default function LaunchPage() {
                 disabled={busy}
                 className="pointer-events-auto min-h-11 rounded-full bg-white/15 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/25 disabled:opacity-40"
               >
-                {busy ? 'Launching…' : 'Close ✕'}
+                {busy ? (
+                  'Launching…'
+                ) : (
+                  <>
+                    Close <X aria-hidden="true" className="ml-1 inline size-4" />
+                  </>
+                )}
               </button>
             </div>
+
+            {!launch && count === null && !busy && (
+              <p className="pointer-events-none absolute bottom-24 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/45 px-3 py-1 text-xs text-slate-100 backdrop-blur">
+                <Rotate3d aria-hidden="true" className="size-3.5" /> Hold and drag to look around · pinch to zoom
+              </p>
+            )}
 
             <AnimatePresence>
               {count !== null && (
@@ -309,7 +322,7 @@ function LaunchReport({
     <div className={`card p-5 sm:p-6 ${border} ${solid ? 'bg-space-900/95 backdrop-blur-md' : ''}`}>
       <p className="text-sm font-semibold uppercase tracking-wider text-cyan-300">Launch report</p>
       <h3 className="mt-1 text-2xl font-bold">
-        {launch.tone === 'good' ? '🚀 ' : launch.tone === 'bad' ? '⚠️ ' : '💥 '}
+        <ToneIcon tone={launch.tone} />
         {launch.title}
       </h3>
       <p className="mt-2 text-slate-300">{launch.text}</p>
@@ -347,10 +360,16 @@ function LaunchReport({
   )
 }
 
-const VERDICT = {
-  likely: { icon: '✅', className: 'text-emerald-200' },
-  'at-risk': { icon: '⚠️', className: 'text-amber-200' },
-  unlikely: { icon: '❌', className: 'text-rose-200' },
+const VERDICT: Record<string, { icon: LucideIcon; className: string }> = {
+  likely: { icon: CircleCheck, className: 'text-emerald-200' },
+  'at-risk': { icon: TriangleAlert, className: 'text-amber-200' },
+  unlikely: { icon: CircleX, className: 'text-rose-200' },
+}
+
+function ToneIcon({ tone }: { tone: LaunchOutcome['tone'] }) {
+  const Icon = tone === 'good' ? Rocket : tone === 'bad' ? TriangleAlert : Flame
+  const color = tone === 'good' ? 'text-emerald-300' : tone === 'bad' ? 'text-amber-300' : 'text-rose-400'
+  return <Icon aria-hidden="true" className={`mr-2 inline size-6 -translate-y-0.5 ${color}`} />
 }
 
 /** "Will it complete the mission?" with a reason for each check */
@@ -359,13 +378,17 @@ function OutlookCard({ outlook, preview = false }: { outlook: ReturnType<typeof 
   return (
     <div className={preview ? 'card p-5' : 'mt-4 rounded-xl bg-white/5 p-4'}>
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{preview ? 'Mission outlook before launch' : 'Mission outlook'}</p>
-      <p className={`mt-1 font-semibold ${v.className}`}>
-        {v.icon} {outlook.headline}
+      <p className={`mt-1 flex items-start gap-2 font-semibold ${v.className}`}>
+        <v.icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" /> {outlook.headline}
       </p>
       <ul className="mt-3 space-y-1.5 text-sm">
         {outlook.checks.map((c) => (
           <li key={c.text} className="flex gap-2">
-            <span aria-hidden="true">{c.ok ? '✅' : '⚠️'}</span>
+            {c.ok ? (
+              <CircleCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-emerald-300" />
+            ) : (
+              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-300" />
+            )}
             <span className={c.ok ? 'text-slate-300' : 'text-amber-100'}>{c.text}</span>
           </li>
         ))}
