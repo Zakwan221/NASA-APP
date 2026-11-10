@@ -13,7 +13,7 @@ export interface LaunchResult {
   extraCostM: number
   title: string
   text: string
-  tone: 'good' | 'bad'
+  tone: 'good' | 'bad' | 'fail'
 }
 
 interface MissionStore {

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { INSTRUMENTS, partsIn, SCENARIOS } from '../../../game/data'
+import { INSTRUMENTS, partById, partsIn, SCENARIOS } from '../../../game/data'
 import { evaluate, limitsFor } from '../../../game/engine/evaluate'
 import type { Difficulty, MissionDesign, Part, PartCategory, ResourceKey } from '../../../game/types'
 import { useMission } from '../../../store/missionStore'
+import AssemblyBay from './components/AssemblyBay'
 import Dashboard, { MiniStatus } from './components/Dashboard'
+import { DndProvider, type DragItem } from './components/dnd'
 import OptionCard, { CardRow, CardSlot } from './components/OptionCard'
 import PhaseSteps from './components/PhaseSteps'
+import { useMediaQuery } from './components/useMediaQuery'
 
 const DIFFICULTIES: { id: Difficulty; label: string; text: string }[] = [
   { id: 'cadet', label: 'Cadet', text: 'Simple parts, a big budget and hints.' },
@@ -97,8 +100,23 @@ export default function DesignPage() {
     (a, b) => Number(b.goodFor.includes(scenarioId ?? '')) - Number(a.goodFor.includes(scenarioId ?? '')),
   )
   const blockers = ev.warnings.filter((w) => w.blocking && w.phase === 'design').length
+  const wide = useMediaQuery('(min-width: 1024px)')
+
+  /** A part or instrument dropped on the 3D spacecraft goes into its slot */
+  const fit = (item: DragItem) => {
+    if (item.kind === 'instrument') {
+      if (!design.science.instrumentIds.includes(item.id)) store.toggleInstrument(item.id)
+      return
+    }
+    const slot = SLOTS.find((s) => s.category === partById(item.id)?.category)?.slot
+    if (slot) select(slot, item.id)
+  }
+  const bay = (className: string) => (
+    <AssemblyBay design={design} massKg={ev.massKg} onFit={fit} interactive={wide} className={className} />
+  )
 
   return (
+    <DndProvider>
     <div className="mx-auto w-full max-w-6xl px-4 pb-32 pt-20 sm:px-6 sm:pt-24 lg:pb-16">
       <header className="mb-8">
         <PhaseSteps current="Design" />
@@ -207,7 +225,9 @@ export default function DesignPage() {
             </div>
           </Step>
 
-          <Step n={2} title="Build the spacecraft" hint="Pick one of each. Swipe sideways on a phone to see every option.">
+          <div>
+          {!wide && <div className="sticky top-16 z-20 -mx-4 mb-2 bg-space-950/90 px-4 pb-2 pt-2 backdrop-blur">{bay('h-44')}</div>}
+          <Step n={2} title="Build the spacecraft" hint="Tap a card, or drag it onto the spacecraft. Swipe sideways on a phone to see every option.">
             <div className="space-y-6">
               {SLOTS.map(({ slot, category, title, hint }) => (
                 <div key={slot} role="radiogroup" aria-label={title}>
@@ -223,6 +243,7 @@ export default function DesignPage() {
                             selected={selectedId(slot) === p.id}
                             onSelect={() => select(slot, p.id)}
                             stats={partStats(p)}
+                            dragItem={{ kind: 'part', id: p.id, name: p.name }}
                             explain={p.explain}
                             source={p.source}
                             badge={
@@ -252,6 +273,7 @@ export default function DesignPage() {
                       name={i.name}
                       selected={design.science.instrumentIds.includes(i.id)}
                       onSelect={() => store.toggleInstrument(i.id)}
+                      dragItem={{ kind: 'instrument', id: i.id, name: i.name }}
                       stats={[
                         { label: 'Mass', value: `${i.massKg} kg` },
                         { label: 'Cost', value: `$${i.costM} M` },
@@ -276,6 +298,7 @@ export default function DesignPage() {
               })}
             </CardRow>
           </Step>
+          </div>
 
           <div className="mt-10 lg:hidden">
             <Dashboard ev={ev} phase="design" anchorId="dashboard" />
@@ -290,6 +313,7 @@ export default function DesignPage() {
 
         <aside className="hidden lg:block">
           <div className="sticky top-20 max-h-[calc(100svh-6rem)] overflow-y-auto pb-4">
+            {wide && bay('mb-4 h-64')}
             <Dashboard ev={ev} phase="design" />
           </div>
         </aside>
@@ -308,6 +332,7 @@ export default function DesignPage() {
         </div>
       </div>
     </div>
+    </DndProvider>
   )
 }
 
