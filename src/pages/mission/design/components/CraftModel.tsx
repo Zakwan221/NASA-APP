@@ -10,6 +10,7 @@ import { useRef, type ReactNode } from 'react'
 import { DoubleSide, type Group, type Texture } from 'three'
 import type { MissionDesign } from '../../../../game/types'
 import { foilTexture, solarTexture } from './textures'
+import { useShadows } from './useShadows'
 
 /** Body size per frame [x, y, z]: 1U is a 10 cm cube, drawn here as 0.4 */
 const FRAME_SIZE: Record<string, [number, number, number]> = {
@@ -133,6 +134,8 @@ function Wing({ side, length, height, y }: { side: 1 | -1; length: number; heigh
 }
 
 export default function CraftModel({ design }: { design: MissionDesign }) {
+  const root = useRef<Group>(null)
+  useShadows(root)
   const e = design.engineer
   const hasFrame = Boolean(e.structureId)
   const [sx, sy, sz] = FRAME_SIZE[e.structureId ?? ''] ?? [0.8, 1.2, 0.4]
@@ -143,7 +146,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
   const instruments = design.science.instrumentIds
 
   return (
-    <group>
+    <group ref={root}>
       {/* Frame (a ghost outline until one is picked) */}
       {hasFrame ? (
         <PopIn key={e.structureId}>

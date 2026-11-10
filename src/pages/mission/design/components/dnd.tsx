@@ -6,6 +6,7 @@
 
 import { createContext, useCallback, useContext, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { ArrowDown, GripVertical } from 'lucide-react'
 
 export interface DragItem {
   kind: 'part' | 'instrument'
@@ -85,7 +86,8 @@ export function DndProvider({ children }: { children: ReactNode }) {
             }`}
             style={{ left: drag.x, top: drag.y }}
           >
-            {drag.overZone ? '⬇ Drop to fit ' : ''}
+            {drag.overZone && <ArrowDown aria-hidden="true" className="mr-1 inline size-4" />}
+            {drag.overZone ? 'Drop to fit ' : ''}
             {drag.item.name}
           </div>,
           document.body,
@@ -111,7 +113,7 @@ export function DragHandle({ item }: { item: DragItem }) {
       title="Drag onto the spacecraft"
       className="flex min-h-9 cursor-grab touch-none select-none items-center gap-1 rounded-full bg-white/10 px-3 text-xs font-semibold text-slate-200 hover:bg-white/15 active:cursor-grabbing"
     >
-      <span aria-hidden="true">⠿</span> Drag
+      <GripVertical aria-hidden="true" className="size-3.5" /> Drag
     </button>
   )
 }

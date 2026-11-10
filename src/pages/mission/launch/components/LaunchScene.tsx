@@ -5,7 +5,7 @@
  * Lazy-loaded, dpr ≤ 1.5, stops rendering when off-screen.
  */
 
-import { Stars } from '@react-three/drei'
+import { OrbitControls, Stars } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import {
@@ -21,12 +21,14 @@ import {
   type Sprite,
   type SpriteMaterial,
 } from 'three'
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import ErrorBoundary from '../../../../components/ui/ErrorBoundary'
 import type { MissionDesign } from '../../../../game/types'
 import CraftModel from '../../design/components/CraftModel'
 import { Earth, Reflections, Sun } from '../../design/components/SpaceBackdrop'
 import { concreteTexture, glowTexture, groundTexture, smokeTexture } from '../../design/components/textures'
 import { useOnScreen } from '../../design/components/useOnScreen'
+import { useShadows } from '../../design/components/useShadows'
 
 export type FlightTone = 'good' | 'bad' | 'fail'
 
@@ -372,11 +374,19 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
   const ground = useRef<Group>(null)
   const earth = useRef<Group>(null)
   const burning = useRef(false)
+  const controls = useRef<OrbitControlsImpl>(null)
+  /** True while the player is holding and dragging the view */
+  const userDragging = useRef(false)
+  const placed = useRef(false)
+  const focus = useMemo(() => new Vector3(), [])
+  const offset = useMemo(() => new Vector3(), [])
+  const shadowRoot = useRef<Group>(null)
+  useShadows(shadowRoot)
   const startedAt = useRef<number | null>(null)
   const finished = useRef(false)
   const { camera, clock, size } = useThree()
   // Tall phone screens need the camera further back to fit the whole rocket
-  const portrait = size.width / size.height < 0.8 ? 1.35 : 1
+  const portrait = size.width / size.height < 0.8 ? 1.2 : 1
 
   useEffect(() => {
     startedAt.current = flying ? clock.getElapsedTime() : null
@@ -470,12 +480,27 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
       earth.current.position.set(0, y - 30, -6)
     }
 
-    // Camera follows the rocket, with a little shake at liftoff
-    const shake = burning.current && t < 2.5 ? (2.5 - t) * 0.02 : 0
+    // Camera follows the rocket. The player can hold and drag to orbit around it
+    // (OrbitControls); we only move the view along with the rocket and, while
+    // they're not dragging, ease it to a distance that fits the scene.
     const focusY = failed ? Math.min(y, climbY(BREAKUP_AT)) + look.height * 0.55 : y + look.height * 0.55
-    const dist = (6.6 + clamp01(t / 4) * 1.8) * portrait
-    camera.position.set(dist * 0.45 + (Math.random() - 0.5) * shake, focusY + 0.4 + (Math.random() - 0.5) * shake, dist)
-    camera.lookAt(0, focusY, 0)
+    const dist = (7.8 + clamp01(t / 4) * 1.8) * portrait
+    const shake = burning.current && t < 2.5 ? (2.5 - t) * 0.02 : 0
+    focus.set((Math.random() - 0.5) * shake, focusY + (Math.random() - 0.5) * shake, 0)
+    const ctl = controls.current
+    if (!placed.current) {
+      camera.position.set(dist * 0.45, focusY + 0.4, dist)
+      placed.current = true
+    }
+    if (ctl) {
+      offset.copy(camera.position).sub(ctl.target)
+      if (!userDragging.current) offset.setLength(offset.length() + (dist - offset.length()) * 0.05)
+      ctl.target.copy(focus)
+      camera.position.copy(focus).add(offset)
+      ctl.update()
+    } else {
+      camera.lookAt(focus)
+    }
 
     if (flying && !finished.current && t > DURATION[tone]) {
       finished.current = true
@@ -491,12 +516,41 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
       <Stars radius={100} depth={30} count={1500} factor={4} saturation={0.3} fade speed={0.3} />
       <Sun position={[30, 25, -40]} size={10} />
       <hemisphereLight args={['#bae6fd', '#3f6212', 0.6]} />
-      <directionalLight position={[6, 10, 5]} intensity={2.6} color="#fff4dc" />
+      <directionalLight
+        position={[7, 9, 5]}
+        intensity={2.6}
+        color="#fff4dc"
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.03}
+        shadow-camera-left={-7}
+        shadow-camera-right={7}
+        shadow-camera-top={9}
+        shadow-camera-bottom={-4}
+        shadow-camera-near={1}
+        shadow-camera-far={40}
+      />
+      <OrbitControls
+        ref={controls}
+        makeDefault
+        enablePan={false}
+        enableDamping
+        minDistance={2.5}
+        maxDistance={25}
+        onStart={() => {
+          userDragging.current = true
+        }}
+        onEnd={() => {
+          userDragging.current = false
+        }}
+      />
 
       <group ref={earth} visible={false}>
         <Earth radius={28} position={[0, 0, 0]} spin={0.01} />
       </group>
 
+      <group ref={shadowRoot}>
       {/* Ground, pad and tower */}
       <group ref={ground}>
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
@@ -560,7 +614,7 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
             <CraftModel design={design} />
           </group>
 
-          {/* Fairing halves, hinged at the bottom */}
+          {/* Fairing halves (right half: angles 0..π, left half: π..2π), hinged at the bottom */}
           {(
             [
               [fairingL, -1],
@@ -568,17 +622,19 @@ function Scene({ rocketId, design, tone, flying, onDone }: SceneProps) {
             ] as const
           ).map(([ref, side]) => (
             <group key={side} ref={ref} position={[0, upperH * 0.5, 0]}>
-              <mesh position={[side * look.radius * 0.5, upperH * 0.5, 0]} scale={[0.5, 1, 1]}>
-                <cylinderGeometry args={[look.radius * 1.15, look.radius * 1.15, upperH, 24, 1, false, side === 1 ? 0 : Math.PI, Math.PI]} />
-                <meshStandardMaterial color="#f8fafc" metalness={0.2} roughness={0.35} />
+              <mesh position={[0, upperH * 0.5, 0]}>
+                <cylinderGeometry args={[look.radius * 1.15, look.radius * 1.15, upperH, 24, 1, true, side === 1 ? 0 : Math.PI, Math.PI]} />
+                <meshStandardMaterial color="#f8fafc" metalness={0.2} roughness={0.35} side={DoubleSide} />
               </mesh>
-              <mesh position={[side * look.radius * 0.5, upperH + 0.28, 0]} scale={[0.5, 1, 1]}>
-                <coneGeometry args={[look.radius * 1.15, 0.56, 24, 1, false, side === 1 ? 0 : Math.PI, Math.PI]} />
-                <meshStandardMaterial color="#f8fafc" metalness={0.2} roughness={0.35} />
+              <mesh position={[0, upperH + 0.28, 0]}>
+                <coneGeometry args={[look.radius * 1.15, 0.56, 24, 1, true, side === 1 ? 0 : Math.PI, Math.PI]} />
+                <meshStandardMaterial color="#f8fafc" metalness={0.2} roughness={0.35} side={DoubleSide} />
               </mesh>
             </group>
           ))}
         </group>
+      </group>
+
       </group>
 
       {/* Explosion at the break-up point */}
@@ -608,6 +664,7 @@ export default function LaunchScene(props: SceneProps) {
         fallback={<p className="flex h-full items-center justify-center p-4 text-center text-sm text-slate-400">3D view isn’t available on this device.</p>}
       >
         <Canvas
+          shadows="soft"
           dpr={[1, 1.5]}
           frameloop={visible ? 'always' : 'never'}
           camera={{ position: [3, 3, 7], fov: 45, near: 0.1, far: 300 }}

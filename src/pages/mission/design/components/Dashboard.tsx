@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { CircleCheck, Hourglass, HardDrive, Microscope, RadioTower, TriangleAlert, Wallet, Weight, Zap, CircleX, type LucideIcon } from 'lucide-react'
 import type { Evaluation } from '../../../../game/engine/evaluate'
 import type { ResourceKey, ResourceStatus, Warning } from '../../../../game/types'
 
@@ -13,13 +14,13 @@ const LABEL: Record<ResourceKey, string> = {
   lifetime: 'Lifetime',
 }
 
-const ICON: Record<ResourceKey, string> = {
-  mass: '⚖️',
-  power: '⚡',
-  budget: '💰',
-  data: '💾',
-  comms: '📡',
-  lifetime: '⏳',
+const ICON: Record<ResourceKey, LucideIcon> = {
+  mass: Weight,
+  power: Zap,
+  budget: Wallet,
+  data: HardDrive,
+  comms: RadioTower,
+  lifetime: Hourglass,
 }
 
 const ORDER: ResourceKey[] = ['mass', 'power', 'budget', 'data', 'comms', 'lifetime']
@@ -64,13 +65,14 @@ function describe(r: ResourceStatus, ev: Evaluation): { value: string; sub: stri
 function Gauge({ r, ev }: { r: ResourceStatus; ev: Evaluation }) {
   const { value, sub, empty } = describe(r, ev)
   const critical = ev.scenario?.criticalResources.includes(r.key)
+  const Icon = ICON[r.key]
   const fill = r.key === 'comms' ? (r.used && r.available ? Math.min(1, r.used / r.available) : 0) : r.available ? r.used / r.available : 0
   const bad = !empty && !r.ok
   return (
     <div className={`card p-3 ${bad ? 'border-rose-400/40' : ''}`}>
       <p className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-        <span>
-          <span aria-hidden="true">{ICON[r.key]} </span>
+        <span className="flex items-center gap-1.5">
+          <Icon aria-hidden="true" className={`size-3.5 ${bad ? 'text-rose-300' : 'text-cyan-300'}`} />
           {LABEL[r.key]}
         </span>
         {critical && (
@@ -95,7 +97,9 @@ function Gauge({ r, ev }: { r: ResourceStatus; ev: Evaluation }) {
 export function WarningList({ warnings }: { warnings: Warning[] }) {
   const sorted = [...warnings].sort((a, b) => Number(b.blocking) - Number(a.blocking))
   if (sorted.length === 0) {
-    return <p className="rounded-xl bg-emerald-400/10 p-3 text-sm text-emerald-200">✅ No problems found. Every resource has room to spare.</p>
+    return <p className="flex items-start gap-2 rounded-xl bg-emerald-400/10 p-3 text-sm text-emerald-200">
+        <CircleCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> No problems found. Every resource has room to spare.
+      </p>
   }
   return (
     <ul className="space-y-2" aria-live="polite">
@@ -108,10 +112,17 @@ export function WarningList({ warnings }: { warnings: Warning[] }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: EASE_OUT }}
-            className={`rounded-xl p-3 text-sm ${w.blocking ? 'bg-rose-400/10 text-rose-100' : 'bg-amber-300/10 text-amber-100'}`}
+            className={`flex items-start gap-2 rounded-xl p-3 text-sm ${w.blocking ? 'bg-rose-400/10 text-rose-100' : 'bg-amber-300/10 text-amber-100'}`}
           >
-            <span className="mr-1 font-semibold">{w.blocking ? 'Must fix:' : 'Heads-up:'}</span>
-            {w.message}
+            {w.blocking ? (
+              <CircleX aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-rose-300" />
+            ) : (
+              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-300" />
+            )}
+            <span>
+              <span className="mr-1 font-semibold">{w.blocking ? 'Must fix:' : 'Heads-up:'}</span>
+              {w.message}
+            </span>
           </motion.li>
         ))}
       </AnimatePresence>
@@ -145,7 +156,9 @@ export default function Dashboard({
 
       {ev.scenario && (
         <div className="card mt-2 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">🔬 Expected science</p>
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <Microscope aria-hidden="true" className="size-3.5 text-cyan-300" /> Expected science
+          </p>
           <p className="mt-1 font-display font-bold tabular-nums">
             {ev.projectedScience.toLocaleString()} / {target.toLocaleString()}
           </p>
@@ -179,13 +192,14 @@ export function MiniStatus({ ev }: { ev: Evaluation }) {
       {ORDER.map((k) => {
         const r = ev.resources[k]
         const bad = !describe(r, ev).empty && !r.ok
+        const Icon = ICON[k]
         return (
           <span
             key={k}
             title={`${LABEL[k]}: ${bad ? 'problem' : 'ok'}`}
             className={`flex size-8 items-center justify-center rounded-lg text-sm ${bad ? 'bg-rose-400/25' : 'bg-white/10'}`}
           >
-            <span aria-hidden="true">{ICON[k]}</span>
+            <Icon aria-hidden="true" className={`size-4 ${bad ? 'text-rose-200' : 'text-slate-200'}`} />
             <span className="sr-only">
               {LABEL[k]} {bad ? 'problem' : 'ok'}
             </span>
