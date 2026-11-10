@@ -7,8 +7,9 @@
 import { Edges } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useRef, type ReactNode } from 'react'
-import { DoubleSide, type Group } from 'three'
+import { DoubleSide, type Group, type Texture } from 'three'
 import type { MissionDesign } from '../../../../game/types'
+import { foilTexture, solarTexture } from './textures'
 
 /** Body size per frame [x, y, z]: 1U is a 10 cm cube, drawn here as 0.4 */
 const FRAME_SIZE: Record<string, [number, number, number]> = {
@@ -52,6 +53,8 @@ function Box({
   color,
   emissive,
   metal = 0.3,
+  rough = 0.45,
+  map,
   edges,
 }: {
   size: [number, number, number]
@@ -59,12 +62,21 @@ function Box({
   color: string
   emissive?: string
   metal?: number
+  rough?: number
+  map?: Texture
   edges?: string
 }) {
   return (
     <mesh position={position}>
       <boxGeometry args={size} />
-      <meshStandardMaterial color={color} metalness={metal} roughness={0.45} emissive={emissive ?? '#000'} emissiveIntensity={emissive ? 0.8 : 0} />
+      <meshStandardMaterial
+        color={color}
+        map={map}
+        metalness={metal}
+        roughness={rough}
+        emissive={emissive ?? '#000'}
+        emissiveIntensity={emissive ? 0.8 : 0}
+      />
       {edges && <Edges color={edges} />}
     </mesh>
   )
@@ -109,10 +121,11 @@ function Wing({ side, length, height, y }: { side: 1 | -1; length: number; heigh
           key={i}
           size={[seg - 0.03, height, 0.025]}
           position={[side * (0.18 + seg * i + seg / 2), y, 0]}
-          color={COLORS.cell}
-          emissive="#0b1d4d"
-          metal={0.5}
-          edges={COLORS.cellEdge}
+          color="#ffffff"
+          map={solarTexture()}
+          metal={0.55}
+          rough={0.22}
+          edges="#94a3b8"
         />
       ))}
     </group>
@@ -134,7 +147,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       {/* Frame (a ghost outline until one is picked) */}
       {hasFrame ? (
         <PopIn key={e.structureId}>
-          <Box size={[sx, sy, sz]} color={COLORS.foil} metal={0.7} edges={COLORS.rail} />
+          <Box size={[sx, sy, sz]} color="#ffe3a3" map={foilTexture()} metal={0.9} rough={0.28} edges="#e2e8f0" />
         </PopIn>
       ) : (
         <mesh>
@@ -146,9 +159,9 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       {/* Solar */}
       {e.solarId === 'solar-body' && (
         <PopIn key="solar-body">
-          <Box size={[sx * 0.9, sy * 0.85, 0.01]} position={[0, 0, front + 0.006]} color={COLORS.cell} emissive="#0b1d4d" edges={COLORS.cellEdge} />
-          <Box size={[0.01, sy * 0.85, sz * 0.9]} position={[sx / 2 + 0.006, 0, 0]} color={COLORS.cell} emissive="#0b1d4d" edges={COLORS.cellEdge} />
-          <Box size={[0.01, sy * 0.85, sz * 0.9]} position={[-sx / 2 - 0.006, 0, 0]} color={COLORS.cell} emissive="#0b1d4d" edges={COLORS.cellEdge} />
+          <Box size={[sx * 0.9, sy * 0.85, 0.01]} position={[0, 0, front + 0.006]} color="#ffffff" map={solarTexture()} metal={0.55} rough={0.22} />
+          <Box size={[0.01, sy * 0.85, sz * 0.9]} position={[sx / 2 + 0.006, 0, 0]} color="#ffffff" map={solarTexture()} metal={0.55} rough={0.22} />
+          <Box size={[0.01, sy * 0.85, sz * 0.9]} position={[-sx / 2 - 0.006, 0, 0]} color="#ffffff" map={solarTexture()} metal={0.55} rough={0.22} />
         </PopIn>
       )}
       {(e.solarId === 'solar-deploy' || e.solarId === 'solar-large') && (

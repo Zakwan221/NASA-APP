@@ -26,6 +26,18 @@ export default function LaunchPage() {
   const [count, setCount] = useState<number | null>(null)
   /** The rolled result, shown only after the animation finishes */
   const [flight, setFlight] = useState<LaunchOutcome | null>(null)
+  /** The full-screen 3D launch is open */
+  const [stageOpen, setStageOpen] = useState(false)
+
+  // Full screen: stop the page behind from scrolling
+  useEffect(() => {
+    if (!stageOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [stageOpen])
 
   const orbit = ev.orbit
   const rocket = ROCKETS.find((r) => r.id === design.comms.launchVehicleId)
@@ -54,6 +66,7 @@ export default function LaunchPage() {
   const tryAgain = () => {
     setFlight(null)
     setLaunch(null)
+    setStageOpen(false)
   }
 
   return (
@@ -157,111 +170,36 @@ export default function LaunchPage() {
             </div>
           </section>
 
-          {/* 3D launch stage */}
           <section className="mt-10" aria-label="Launch">
             <h2 className="text-xl font-bold">
               <span className="text-cyan-300">3.</span> Launch
             </h2>
-            <div className="card relative mt-4 h-80 overflow-hidden sm:h-[26rem]">
-              {rocket && orbit ? (
-                <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-400">Loading 3D…</div>}>
-                  <LaunchScene
-                    rocketId={rocket.id}
-                    design={design}
-                    tone={sceneTone}
-                    flying={flight !== null}
-                    onDone={() => flight && setLaunch(flight)}
-                  />
-                </Suspense>
+            <div className="mt-4">
+              {launch ? (
+                <LaunchReport launch={launch} outlook={outlook} onFly={() => navigate('/mission/operate')} onRetry={tryAgain} />
               ) : (
-                <p className="flex h-full items-center justify-center p-6 text-center text-slate-400">Pick an orbit and a rocket to roll it out to the pad.</p>
-              )}
-              <AnimatePresence>
-                {count !== null && (
-                  <motion.p
-                    key={count}
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3, ease: EASE_OUT }}
-                    role="status"
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center font-display text-8xl font-bold tabular-nums text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
-                  >
-                    {count > 0 ? count : 'Liftoff!'}
-                  </motion.p>
-                )}
-              </AnimatePresence>
-              {rocket && !launch && !busy && (
-                <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/50 px-3 py-1 text-xs font-semibold text-white">
-                  {rocket.name} · {pct(1 - failureChance(rocket, difficulty))} reliable
-                </p>
-              )}
-            </div>
-
-            <div className="mt-4" aria-live="polite">
-              <AnimatePresence mode="wait">
-                {launch ? (
-                  <motion.div
-                    key="result"
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, ease: EASE_OUT }}
-                    className={`card p-6 ${launch.tone === 'good' ? 'border-emerald-400/40' : launch.tone === 'bad' ? 'border-amber-300/40' : 'border-rose-400/50'}`}
-                  >
-                    <p className="text-sm font-semibold uppercase tracking-wider text-cyan-300">Launch report</p>
-                    <h3 className="mt-1 text-2xl font-bold">
-                      {launch.tone === 'good' ? '🚀 ' : launch.tone === 'bad' ? '⚠️ ' : '💥 '}
-                      {launch.title}
-                    </h3>
-                    <p className="mt-2 text-slate-300">{launch.text}</p>
-
-                    {launch.tone === 'fail' ? (
-                      <div className="mt-5 flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={tryAgain}
-                          className="min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98]"
-                        >
-                          Build another and try again
-                        </button>
-                        <Link to="/mission/design" onClick={tryAgain} className="inline-flex min-h-12 items-center rounded-full border border-white/20 px-6 font-semibold hover:bg-white/10">
-                          Change the design
-                        </Link>
-                      </div>
-                    ) : (
-                      <>
-                        <OutlookCard outlook={outlook} />
-                        <button
-                          type="button"
-                          onClick={() => navigate('/mission/operate')}
-                          className="glow-violet mt-5 min-h-14 rounded-full bg-violet-500 px-8 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
-                        >
-                          Start flying →
-                        </button>
-                      </>
+                <>
+                  {ev.launchReady && <OutlookCard outlook={outlook} preview />}
+                  <div className="mt-4 flex flex-wrap items-center gap-4">
+                    <button
+                      type="button"
+                      disabled={!canLaunch}
+                      onClick={() => {
+                        setStageOpen(true)
+                        setCount(3)
+                      }}
+                      className="glow-cyan min-h-16 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-10 text-xl font-bold text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:from-white/10 disabled:to-white/10 disabled:text-slate-400 disabled:shadow-none"
+                    >
+                      Launch 🚀
+                    </button>
+                    {!ev.launchReady && (
+                      <p className="text-sm text-slate-400">
+                        Fix the {blockers} “Must fix” item{blockers === 1 ? '' : 's'} on the dashboard first.
+                      </p>
                     )}
-                  </motion.div>
-                ) : (
-                  <motion.div key="go" exit={{ opacity: 0 }}>
-                    {ev.launchReady && <OutlookCard outlook={outlook} preview />}
-                    <div className="mt-4 flex flex-wrap items-center gap-4">
-                      <button
-                        type="button"
-                        disabled={!canLaunch}
-                        onClick={() => setCount(3)}
-                        className="glow-cyan min-h-14 rounded-full bg-cyan-400 px-10 text-lg font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none"
-                      >
-                        {busy ? 'Launching…' : 'Launch 🚀'}
-                      </button>
-                      {!ev.launchReady && (
-                        <p className="text-sm text-slate-400">
-                          Fix the {blockers} “Must fix” item{blockers === 1 ? '' : 's'} on the dashboard first.
-                        </p>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
@@ -277,6 +215,69 @@ export default function LaunchPage() {
         </aside>
       </div>
 
+      {/* Full-screen 3D launch */}
+      <AnimatePresence>
+        {stageOpen && rocket && orbit && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[60] bg-space-950"
+            role="dialog"
+            aria-label="Launch"
+          >
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-slate-400">Rolling out to the pad…</div>}>
+              <LaunchScene rocketId={rocket.id} design={design} tone={sceneTone} flying={flight !== null} onDone={() => flight && setLaunch(flight)} />
+            </Suspense>
+
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-gradient-to-b from-black/70 to-transparent p-4">
+              <p className="text-sm text-white">
+                <span className="block font-semibold">{rocket.name}</span>
+                <span className="text-slate-300">
+                  To {orbit.name} · {pct(1 - failureChance(rocket, difficulty))} reliable
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setStageOpen(false)}
+                disabled={busy}
+                className="pointer-events-auto min-h-11 rounded-full bg-white/15 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/25 disabled:opacity-40"
+              >
+                {busy ? 'Launching…' : 'Close ✕'}
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {count !== null && (
+                <motion.p
+                  key={count}
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, ease: EASE_OUT }}
+                  role="status"
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center font-display text-8xl font-bold tabular-nums text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.9)] sm:text-9xl"
+                >
+                  {count > 0 ? count : 'Liftoff!'}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            {launch && (
+              <motion.div
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.45, ease: EASE_OUT }}
+                className="absolute inset-x-0 bottom-0 max-h-[60svh] overflow-y-auto p-4 sm:mx-auto sm:max-w-xl"
+              >
+                <LaunchReport launch={launch} outlook={outlook} onFly={() => navigate('/mission/operate')} onRetry={tryAgain} solid />
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Phone: status bar */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-space-950/95 px-4 py-3 backdrop-blur lg:hidden">
         <a href="#dashboard" className="mx-auto flex max-w-6xl items-center justify-between gap-3" aria-label="Show the full dashboard">
@@ -284,6 +285,64 @@ export default function LaunchPage() {
           <span className="text-right text-xs text-slate-400">{ev.launchReady ? 'Ready to launch' : `${blockers} to fix · tap for why`}</span>
         </a>
       </div>
+    </div>
+  )
+}
+
+/** The launch result: success with the mission outlook, or failure with retry options */
+function LaunchReport({
+  launch,
+  outlook,
+  onFly,
+  onRetry,
+  solid = false,
+}: {
+  launch: LaunchOutcome
+  outlook: ReturnType<typeof missionOutlook>
+  onFly: () => void
+  onRetry: () => void
+  /** Opaque background, for showing on top of the 3D scene */
+  solid?: boolean
+}) {
+  const border = launch.tone === 'good' ? 'border-emerald-400/50' : launch.tone === 'bad' ? 'border-amber-300/50' : 'border-rose-400/60'
+  return (
+    <div className={`card p-5 sm:p-6 ${border} ${solid ? 'bg-space-900/95 backdrop-blur-md' : ''}`}>
+      <p className="text-sm font-semibold uppercase tracking-wider text-cyan-300">Launch report</p>
+      <h3 className="mt-1 text-2xl font-bold">
+        {launch.tone === 'good' ? '🚀 ' : launch.tone === 'bad' ? '⚠️ ' : '💥 '}
+        {launch.title}
+      </h3>
+      <p className="mt-2 text-slate-300">{launch.text}</p>
+
+      {launch.tone === 'fail' ? (
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98]"
+          >
+            Build another and try again
+          </button>
+          <Link
+            to="/mission/design?build=7"
+            onClick={onRetry}
+            className="inline-flex min-h-12 items-center rounded-full border border-white/20 px-6 font-semibold hover:bg-white/10"
+          >
+            Change the design
+          </Link>
+        </div>
+      ) : (
+        <>
+          <OutlookCard outlook={outlook} />
+          <button
+            type="button"
+            onClick={onFly}
+            className="glow-violet mt-5 min-h-14 rounded-full bg-violet-500 px-8 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
+          >
+            Start flying →
+          </button>
+        </>
+      )}
     </div>
   )
 }
