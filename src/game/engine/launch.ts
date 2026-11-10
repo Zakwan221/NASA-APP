@@ -132,7 +132,11 @@ export function launchOdds(design: MissionDesign): LaunchOdds {
   factors.push({
     label: 'Radio',
     chance: heard ? 1 : 0,
-    text: heard ? 'Earth can hear your radio from that orbit.' : 'Your radio is too weak to be heard from that far: the spacecraft will go silent.',
+    text: heard
+      ? 'Earth can hear your radio from that orbit.'
+      : design.comms.radioId
+        ? 'Your radio is too weak to be heard from that far: the spacecraft will go silent.'
+        : 'There is no radio, so Earth will never hear from the spacecraft.',
   })
 
   const chance = factors.reduce((p, f) => p * f.chance, 1)
@@ -190,7 +194,9 @@ export function rollLaunch(design: MissionDesign, roll: number, pick: number): L
       extraCostM: 0,
       tone: 'fail',
       title: 'Signal lost',
-      text: `The launch was perfect and the spacecraft reached ${orbit.name}, but its radio is too weak to be heard from ${orbit.altitudeKm.toLocaleString()} km away. Without contact it can’t send any science home. Pick a stronger radio.`,
+      text: design.comms.radioId
+        ? `The launch was perfect and the spacecraft reached ${orbit.name}, but its radio is too weak to be heard from ${orbit.altitudeKm.toLocaleString()} km away. Without contact it can’t send any science home. Pick a stronger radio.`
+        : `The launch was perfect and the spacecraft reached ${orbit.name}, but it has no radio, so it can never send anything home. Add a radio in Design.`,
     }
   }
 

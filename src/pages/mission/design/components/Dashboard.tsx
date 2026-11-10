@@ -120,7 +120,7 @@ export function WarningList({ warnings }: { warnings: Warning[] }) {
               <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-300" />
             )}
             <span>
-              <span className="mr-1 font-semibold">{w.blocking ? 'Must fix:' : 'Heads-up:'}</span>
+              <span className="mr-1 font-semibold">{w.blocking ? 'Problem:' : 'Heads-up:'}</span>
               {w.message}
             </span>
           </motion.li>
