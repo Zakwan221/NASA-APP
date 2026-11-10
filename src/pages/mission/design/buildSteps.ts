@@ -24,5 +24,5 @@ export const BUILD_STEPS: BuildStep[] = [
   { id: 'attitude', title: 'Pointing', icon: Crosshair, hint: 'Turns the spacecraft so instruments aim at the target.', slot: 'attitudeId', category: 'attitude', resources: ['compatibility'] },
   { id: 'radio', title: 'Radio', icon: RadioTower, hint: 'Sends data home. Faster radios use more power.', slot: 'radio', category: 'comms', resources: ['data', 'comms'] },
   { id: 'instruments', title: 'Instruments', icon: Telescope, hint: 'The reason for the mission. More science, but more mass, power, money and data.', resources: ['compatibility', 'power', 'data', 'budget', 'mass'] },
-  { id: 'review', title: 'Review', icon: ClipboardCheck, hint: 'Check the dashboard. Fix anything marked “Must fix”, then launch.', resources: [] },
+  { id: 'review', title: 'Review', icon: ClipboardCheck, hint: 'Check the dashboard. You can launch with problems, but they will show up in flight.', resources: [] },
 ]

@@ -89,11 +89,9 @@ export default function Builder({
 
   const stepDone = (s: BuildStep) =>
     s.slot ? Boolean(selectedId(s.slot)) : s.id === 'instruments' ? design.science.instrumentIds.length > 0 : ev.designReady
-  const canNext = current.id === 'review' ? ev.designReady : stepDone(current)
   const stepWarnings: Warning[] = ev.warnings.filter(
     (w) => w.phase === 'design' && current.resources.includes(w.resource) && !(w.blocking && w.message.startsWith('Pick')),
   )
-  const blockers = ev.warnings.filter((w) => w.blocking && w.phase === 'design').length
 
   const instruments = visible(INSTRUMENTS).sort(
     (a, b) => Number(b.goodFor.includes(scenarioId ?? '')) - Number(a.goodFor.includes(scenarioId ?? '')),
@@ -257,25 +255,17 @@ export default function Builder({
                 <button
                   type="button"
                   onClick={onFinish}
-                  disabled={!canNext}
                   className="glow-cyan min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none"
                 >
-                  {canNext ? (
-                    <>
-                      Go to launch <Rocket aria-hidden="true" className="ml-1 inline size-4" />
-                    </>
-                  ) : (
-                    `${blockers} to fix`
-                  )}
+                  Go to launch <Rocket aria-hidden="true" className="ml-1 inline size-4" />
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => onStep(step + 1)}
-                  disabled={!canNext}
                   className="min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400"
                 >
-                  {canNext ? 'Next →' : current.id === 'instruments' ? 'Pick at least one' : 'Pick one'}
+                  {stepDone(current) ? 'Next →' : 'Skip →'}
                 </button>
               )}
             </div>

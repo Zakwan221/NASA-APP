@@ -104,9 +104,9 @@ export interface Evaluation {
   instrumentUptime: number
   /** Expected science reaching Earth over the planned lifetime */
   projectedScience: number
-  /** True when nothing on the Design screen blocks moving on */
+  /** A mission is chosen, so the player can go on to Launch (problems never block) */
   designReady: boolean
-  /** True when the spacecraft can launch */
+  /** A mission, orbit and rocket are chosen, so it can launch (whatever its problems) */
   launchReady: boolean
 }
 
@@ -326,8 +326,9 @@ export function evaluate(design: MissionDesign): Evaluation {
     budgetLeftM,
     instrumentUptime,
     projectedScience,
-    designReady: !warnings.some((w) => w.blocking && w.phase === 'design'),
-    launchReady: !warnings.some((w) => w.blocking),
+    // Problems never stop the game: they show up as what goes wrong in flight
+    designReady: Boolean(scenario),
+    launchReady: Boolean(scenario && chosenOrbit && rocket),
   }
 }
 

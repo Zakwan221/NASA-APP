@@ -69,7 +69,16 @@ export default function LaunchPage() {
 
   /** Roll what happens now, so the countdown can show a HOLD before liftoff */
   const startLaunch = () => {
-    const outcome = rollLaunch(design, Math.random(), Math.random())
+    // Nothing blocks a launch: pick an orbit and rocket if the player skipped them
+    const orbitId = design.comms.orbitId ?? scenario?.allowedOrbits[0] ?? 'sso'
+    const reaching = ROCKETS.filter((r) => r.capacityKg[orbitId] !== undefined).sort((a, b) => a.costM - b.costM)
+    const rocketId =
+      design.comms.launchVehicleId ??
+      (reaching.find((r) => (r.capacityKg[orbitId] ?? 0) >= ev.massKg) ?? reaching.at(-1) ?? ROCKETS[0]).id
+    if (orbitId !== design.comms.orbitId) setOrbit(orbitId)
+    if (rocketId !== design.comms.launchVehicleId) setRocket(rocketId)
+    const flying = { ...design, comms: { ...design.comms, orbitId, launchVehicleId: rocketId } }
+    const outcome = rollLaunch(flying, Math.random(), Math.random())
     const hold = holdLabel(outcome.kind)
     const beats: Beat[] = [
       { label: '3', ms: 800 },
@@ -85,9 +94,8 @@ export default function LaunchPage() {
 
   if (!ev.designReady) return <Navigate to="/mission/design" replace />
 
-  const blockers = ev.warnings.filter((w) => w.blocking).length
   const busy = countdown !== null || (flight !== null && !launch)
-  const canLaunch = ev.launchReady && !launch && !busy
+  const canLaunch = !launch && !busy
   const sceneKind = flight?.kind ?? launch?.kind ?? null
 
   const tryAgain = () => {
@@ -127,8 +135,12 @@ export default function LaunchPage() {
                       <OptionCard
                         name={o.name}
                         selected={design.comms.orbitId === o.id}
-                        disabled={!allowed || busy || Boolean(launch)}
-                        note={allowed ? undefined : 'Not possible for this mission.'}
+                        disabled={busy || Boolean(launch)}
+                        badge={
+                          !allowed && (
+                            <span className="rounded-full bg-rose-400/15 px-2 py-0.5 text-[11px] text-rose-200">Can’t see the target</span>
+                          )
+                        }
                         onSelect={() => setOrbit(o.id)}
                         stats={[
                           { label: 'Distance', value: km(o.altitudeKm) },
@@ -224,9 +236,7 @@ export default function LaunchPage() {
                       Launch <Rocket aria-hidden="true" className="ml-2 inline size-5" />
                     </button>
                     {!ev.launchReady ? (
-                      <p className="text-sm text-slate-400">
-                        Pick an orbit and a rocket first{blockers > 2 ? '' : ' (see the dashboard)'}.
-                      </p>
+                      <p className="text-sm text-slate-400">No orbit or rocket picked: launching will choose them for you.</p>
                     ) : (
                       odds.chance < 0.5 && (
                         <p className="text-sm text-amber-200">You can launch anyway, but the odds are against you.</p>
@@ -343,7 +353,7 @@ export default function LaunchPage() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-space-950/95 px-4 py-3 backdrop-blur lg:hidden">
         <a href="#dashboard" className="mx-auto flex max-w-6xl items-center justify-between gap-3" aria-label="Show the full dashboard">
           <MiniStatus ev={ev} />
-          <span className="text-right text-xs text-slate-400">{ev.launchReady ? 'Ready to launch' : `${blockers} to fix · tap for why`}</span>
+          <span className="text-right text-xs text-slate-400">{ev.launchReady && odds.chance >= 0.5 ? 'Ready to launch' : 'Launch anyway · tap for why'}</span>
         </a>
       </div>
     </div>
