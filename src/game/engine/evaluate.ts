@@ -227,8 +227,8 @@ export function evaluate(design: MissionDesign): Evaluation {
     warn(
       'comms',
       'launch',
-      true,
-      `The ${radio.name} can be heard up to ${fmtKm(rangeKm)}, but ${chosenOrbit.name} is ${fmtKm(chosenOrbit.altitudeKm)} away: nobody on Earth would hear it. Pick a stronger radio in Design, or a closer orbit.`,
+      false,
+      `The ${radio.name} can be heard up to ${fmtKm(rangeKm)}, but ${chosenOrbit.name} is ${fmtKm(chosenOrbit.altitudeKm)} away: after launch nobody on Earth would hear it and the mission is lost. Pick a stronger radio in Design, or a closer orbit.`,
     )
   }
 
@@ -246,13 +246,13 @@ export function evaluate(design: MissionDesign): Evaluation {
   }
   if (!rocket) warn('mass', 'launch', true, 'Pick a rocket to get to your orbit.')
   else if (chosenOrbit && rocketCap === undefined) {
-    warn('mass', 'launch', true, `The ${rocket.name} can’t reach ${chosenOrbit.name}. Pick another rocket.`)
+    warn('mass', 'launch', false, `The ${rocket.name} can’t reach ${chosenOrbit.name}: it would leave your spacecraft in the wrong orbit. Pick another rocket.`)
   } else if (rocketCap !== undefined && massKg > rocketCap) {
     warn(
       'mass',
       'launch',
-      true,
-      `Your spacecraft weighs ${massKg} kg but the ${rocket.name} can only carry ${rocketCap} kg to ${chosenOrbit!.name}. Pick a bigger rocket or a lighter design.`,
+      false,
+      `Your spacecraft weighs ${massKg} kg but the ${rocket.name} can only carry ${rocketCap} kg to ${chosenOrbit!.name}, so it may not reach orbit. Pick a bigger rocket or a lighter design.`,
     )
   }
 
@@ -277,8 +277,8 @@ export function evaluate(design: MissionDesign): Evaluation {
     warn(
       'budget',
       rocket ? 'launch' : 'design',
-      true,
-      `Over budget: building costs $${buildCostM} M${rocket ? ` and the launch $${launchCostM} M` : ''}, but you only have $${limits.budgetM} M. Cut instruments or pick cheaper parts${rocket ? ' or a cheaper rocket' : ''}.`,
+      false,
+      `Over budget: building costs $${buildCostM} M${rocket ? ` and the launch $${launchCostM} M` : ''}, but you only have ${limits.budgetM} M, so there is no money to run the mission. Cut instruments or pick cheaper parts${rocket ? ' or a cheaper rocket' : ''}.`,
     )
   } else if (budgetLeftM < opsReserveM) {
     warn(

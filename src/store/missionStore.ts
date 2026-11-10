@@ -5,16 +5,11 @@
 
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import type { LaunchOutcome } from '../game/engine/launch'
 import { EMPTY_DESIGN, type Difficulty, type MissionDesign, type OrbitId } from '../game/types'
 
 /** What happened on launch day, decided once per launch */
-export interface LaunchResult {
-  /** Money lost on launch day (USD M), taken from the operations budget */
-  extraCostM: number
-  title: string
-  text: string
-  tone: 'good' | 'bad' | 'fail'
-}
+export type LaunchResult = LaunchOutcome
 
 interface MissionStore {
   design: MissionDesign
@@ -68,7 +63,9 @@ export const useMission = create<MissionStore>()(
     }),
     {
       name: 'orbitly:mission',
-      version: 1,
+      version: 2,
+      // v1 launches had no `kind`; drop them so the player simply launches again
+      migrate: (persisted) => ({ ...(persisted as object), launch: null }) as never,
       storage: createJSONStorage(() => localStorage),
     },
   ),
