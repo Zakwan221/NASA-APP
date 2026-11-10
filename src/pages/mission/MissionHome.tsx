@@ -3,10 +3,10 @@ import { Shell } from './operate/OperatePage'
 
 const OPTIONS = [
   {
-    to: '/mission/operate',
+    to: '/mission/design',
     icon: '🧑‍🚀',
     title: 'Fly solo',
-    text: 'Run the whole mission yourself, on this device.',
+    text: 'Design, launch and fly the whole mission yourself, on this device.',
   },
   {
     to: '/mission/team/host',

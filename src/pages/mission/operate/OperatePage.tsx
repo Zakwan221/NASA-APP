@@ -19,13 +19,25 @@ import { PLACEHOLDER_CRAFT } from './placeholderCraft'
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
 /** Phase 3, solo: fly the mission month by month in this browser. */
-export default function OperatePage({ craft = PLACEHOLDER_CRAFT }: { craft?: FlightSpacecraft }) {
+export default function OperatePage({
+  craft = PLACEHOLDER_CRAFT,
+  reportFooter,
+}: {
+  craft?: FlightSpacecraft
+  /** Extra content on the Report screen, e.g. the Redesign button */
+  reportFooter?: ReactNode
+}) {
   const [state, setState] = useState<OperateState>(() => startOperate(craft, newSeed()))
 
   if (state.ended) {
     return (
       <Shell>
-        <ReportScreen craft={craft} state={state} onFlyAgain={() => setState(startOperate(craft, newSeed()))} />
+        <ReportScreen
+          craft={craft}
+          state={state}
+          onFlyAgain={() => setState(startOperate(craft, newSeed()))}
+          footer={reportFooter}
+        />
       </Shell>
     )
   }
