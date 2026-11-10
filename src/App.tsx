@@ -3,6 +3,7 @@ import Layout from './components/layout/Layout'
 import GamesPage from './pages/games/GamesPage'
 import HomePage from './pages/home/HomePage'
 import InfoPage from './pages/info/InfoPage'
+import MissionPage from './pages/mission/MissionPage'
 
 export default function App() {
   return (
@@ -11,7 +12,8 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/info" element={<InfoPage />} />
-          <Route path="/games" element={<GamesPage />} />
+          <Route path="/games/*" element={<GamesPage />} />
+          <Route path="/mission/*" element={<MissionPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
