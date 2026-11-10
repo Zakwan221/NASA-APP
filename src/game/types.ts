@@ -91,6 +91,8 @@ export interface LaunchVehicle {
   capacityKg: Partial<Record<OrbitId, number>>
   /** 0..1 chance of a launch-day problem (used by random events) */
   riskOfIssue: number
+  /** 0..1 chance the rocket fails and the spacecraft is lost. Reliability = 1 − failureRate */
+  failureRate: number
   explain: string
   source: string
 }

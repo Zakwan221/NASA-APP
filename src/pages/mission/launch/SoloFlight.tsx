@@ -10,9 +10,12 @@ import OperatePage from '../operate/OperatePage'
  */
 export default function SoloFlight() {
   const { design, launch } = useMission()
-  const craft = useMemo(() => (launch ? buildFlight(design, launch.extraCostM) : null), [design, launch])
+  const craft = useMemo(
+    () => (launch && launch.tone !== 'fail' ? buildFlight(design, launch.extraCostM) : null),
+    [design, launch],
+  )
 
-  if (!craft) return <Navigate to={launch ? '/mission/design' : '/mission/launch'} replace />
+  if (!craft) return <Navigate to={launch && launch.tone !== 'fail' ? '/mission/design' : '/mission/launch'} replace />
 
   return (
     <OperatePage

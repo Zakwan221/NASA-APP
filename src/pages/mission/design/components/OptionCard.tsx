@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { DragHandle, type DragItem } from './dnd'
 
 /** A pickable part, instrument, orbit or rocket with its numbers and a "What is this?" note */
 export default function OptionCard({
@@ -12,6 +13,7 @@ export default function OptionCard({
   badge,
   multi = false,
   note,
+  dragItem,
 }: {
   name: string
   selected: boolean
@@ -25,6 +27,8 @@ export default function OptionCard({
   multi?: boolean
   /** Shown when disabled, e.g. why it can't be picked */
   note?: string
+  /** Makes the card draggable onto the spacecraft */
+  dragItem?: DragItem
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -67,6 +71,7 @@ export default function OptionCard({
       {disabled && note && <p className="mt-2 text-xs text-rose-200">{note}</p>}
 
       <div className="mt-auto pt-2">
+        <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -75,6 +80,8 @@ export default function OptionCard({
         >
           {open ? 'Hide' : 'What is this?'}
         </button>
+        {dragItem && !disabled && <DragHandle item={dragItem} />}
+        </div>
         {open && (
           <p className="text-xs leading-relaxed text-slate-300">
             {explain}
