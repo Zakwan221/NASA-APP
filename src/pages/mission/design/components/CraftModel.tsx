@@ -4,10 +4,10 @@
  * Every part pops in when it is added, so players see their choice land.
  */
 
-import { Edges } from '@react-three/drei'
+import { Edges, RoundedBox } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useRef, type ReactNode } from 'react'
-import { DoubleSide, type Group, type Texture } from 'three'
+import { useMemo, useRef, type ReactNode } from 'react'
+import { DoubleSide, LatheGeometry, Vector2, type Group, type Texture } from 'three'
 import type { MissionDesign } from '../../../../game/types'
 import { foilTexture, solarTexture } from './textures'
 import { useShadows } from './useShadows'
@@ -102,13 +102,42 @@ function Rod({ from, length, axis, color, radius = 0.02 }: { from: [number, numb
 }
 
 function Dish({ radius, position }: { radius: number; position: [number, number, number] }) {
+  // A shallow parabola turned on a lathe, like a real antenna reflector
+  const bowl = useMemo(() => {
+    const pts = Array.from({ length: 12 }, (_, i) => {
+      const t = i / 11
+      return new Vector2(Math.max(0.002, radius * t), radius * 0.38 * t * t)
+    })
+    return new LatheGeometry(pts, 40)
+  }, [radius])
+  const mast = radius * 0.35
   return (
     <group position={position}>
-      <Rod from={[0, 0, 0]} length={radius * 0.6} axis="y" color={COLORS.rail} />
-      <mesh position={[0, radius * 0.6 + radius * 0.55, 0]} rotation={[Math.PI, 0, 0]}>
-        <sphereGeometry args={[radius, 20, 8, 0, Math.PI * 2, 0, Math.PI / 4]} />
-        <meshStandardMaterial color={COLORS.white} side={DoubleSide} metalness={0.2} roughness={0.5} />
-      </mesh>
+      <Rod from={[0, 0, 0]} length={mast} axis="y" color={COLORS.rail} radius={radius * 0.05} />
+      <group position={[0, mast, 0]}>
+        <mesh geometry={bowl}>
+          <meshStandardMaterial color={COLORS.white} side={DoubleSide} metalness={0.35} roughness={0.35} />
+        </mesh>
+        {/* Feed horn at the focus, held by three struts */}
+        <mesh position={[0, radius * 0.62, 0]}>
+          <cylinderGeometry args={[radius * 0.07, radius * 0.1, radius * 0.14, 12]} />
+          <meshStandardMaterial color={COLORS.dark} metalness={0.7} roughness={0.35} />
+        </mesh>
+        {[0, 1, 2].map((i) => {
+          const a = (i / 3) * Math.PI * 2
+          const reach = radius * 0.8
+          return (
+            <mesh
+              key={i}
+              position={[(Math.cos(a) * reach) / 2, radius * 0.44, (Math.sin(a) * reach) / 2]}
+              rotation={[0, -a, Math.atan2(radius * 0.38, reach) + Math.PI / 2 - 0.25]}
+            >
+              <cylinderGeometry args={[radius * 0.012, radius * 0.012, reach * 1.02, 6]} />
+              <meshStandardMaterial color={COLORS.rail} metalness={0.7} roughness={0.4} />
+            </mesh>
+          )
+        })}
+      </group>
     </group>
   )
 }
@@ -120,18 +149,18 @@ function Wing({ side, length, height, y }: { side: 1 | -1; length: number; heigh
   return (
     <group>
       <Rod from={[0, y, 0]} length={side * 0.18} axis="x" color={COLORS.rail} />
-      {Array.from({ length: segments }, (_, i) => (
-        <Box
-          key={i}
-          size={[seg - 0.03, height, 0.025]}
-          position={[side * (0.18 + seg * i + seg / 2), y, 0]}
-          color="#ffffff"
-          map={solarTexture()}
-          metal={0.55}
-          rough={0.22}
-          edges="#94a3b8"
-        />
-      ))}
+      {Array.from({ length: segments }, (_, i) => {
+        const x = side * (0.18 + seg * i + seg / 2)
+        return (
+          <group key={i}>
+            {/* Cells on the sunny side, an aluminium frame behind them */}
+            <Box size={[seg - 0.05, height - 0.04, 0.012]} position={[x, y, 0.012]} color="#ffffff" map={solarTexture()} metal={0.55} rough={0.2} />
+            <Box size={[seg - 0.02, height, 0.016]} position={[x, y, 0]} color="#cbd5e1" metal={0.8} rough={0.35} />
+            {/* Hinge between this panel and the next */}
+            <Rod from={[x - side * (seg / 2), y - height * 0.3, 0]} length={height * 0.6} axis="y" color={COLORS.rail} radius={0.014} />
+          </group>
+        )
+      })}
     </group>
   )
 }
@@ -153,7 +182,22 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       {/* Frame (a ghost outline until one is picked) */}
       {hasFrame ? (
         <PopIn key={e.structureId}>
-          <Box size={[sx, sy, sz]} color="#ffe3a3" map={foilTexture()} metal={0.9} rough={0.28} edges="#e2e8f0" />
+          <RoundedBox args={[sx, sy, sz]} radius={0.025} smoothness={3}>
+            <meshStandardMaterial color="#ffe3a3" map={foilTexture()} metalness={0.9} roughness={0.3} />
+          </RoundedBox>
+          {/* Aluminium rails down the four corners and plates on both ends */}
+          {(
+            [
+              [1, 1],
+              [1, -1],
+              [-1, 1],
+              [-1, -1],
+            ] as const
+          ).map(([dx, dz]) => (
+            <Box key={`${dx}${dz}`} size={[0.045, sy + 0.04, 0.045]} position={[(dx * sx) / 2, 0, (dz * sz) / 2]} color="#d1d5db" metal={0.9} rough={0.3} />
+          ))}
+          <Box size={[sx + 0.02, 0.025, sz + 0.02]} position={[0, sy / 2 + 0.008, 0]} color="#9ca3af" metal={0.85} rough={0.35} />
+          <Box size={[sx + 0.02, 0.025, sz + 0.02]} position={[0, -sy / 2 - 0.008, 0]} color="#9ca3af" metal={0.85} rough={0.35} />
         </PopIn>
       ) : (
         <mesh>

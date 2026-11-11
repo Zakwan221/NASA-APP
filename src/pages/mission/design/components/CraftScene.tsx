@@ -49,7 +49,7 @@ export default function CraftScene({
           dpr={[1, 1.5]}
           frameloop={visible ? 'always' : 'never'}
           camera={{ position: [2.4 * d, 1.2 * d, 3 * d], fov: 42 }}
-          gl={{ antialias: true, powerPreference: 'low-power' }}
+          gl={{ antialias: true, powerPreference: 'high-performance' }}
         >
           <SpaceBackdrop />
           <Glow strength={0.7} />

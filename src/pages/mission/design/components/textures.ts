@@ -120,7 +120,8 @@ export const groundTexture = () => {
       ctx.fillRect(r() * s, r() * s, 2 + r() * 6, 2 + r() * 6)
     }
   })
-  tex.repeat.set(10, 10)
+  tex.repeat.set(60, 60)
+  tex.anisotropy = 8
   return tex
 }
 

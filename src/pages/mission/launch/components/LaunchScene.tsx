@@ -11,9 +11,10 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import {
   AdditiveBlending,
   BackSide,
-  DoubleSide,
+  MathUtils,
   NormalBlending,
   Vector3,
+  type Fog,
   type Group,
   type Object3D,
   type PointLight,
@@ -27,29 +28,13 @@ import type { LaunchKind } from '../../../../game/engine/launch'
 import type { MissionDesign } from '../../../../game/types'
 import CraftModel from '../../design/components/CraftModel'
 import { Earth, Reflections, Sun } from '../../design/components/SpaceBackdrop'
-import { concreteTexture, glowTexture, groundTexture, smokeTexture } from '../../design/components/textures'
+import { glowTexture, smokeTexture } from '../../design/components/textures'
 import { useOnScreen } from '../../design/components/useOnScreen'
 import { useShadows } from '../../design/components/useShadows'
 import Glow from '../../design/components/Glow'
+import { Booster, EngineCluster, FairingHalf, GridFins, LaunchSite, StageBody, VacuumEngine } from './Rocket'
+import { ROCKET_LOOK, rocketTop, type RocketLook } from './rocketLook'
 
-
-interface RocketLook {
-  height: number
-  radius: number
-  body: string
-  band: string
-  stripe: string
-  boosters: boolean
-  boosterColor: string
-}
-
-const LOOK: Record<string, RocketLook> = {
-  'small-launcher': { height: 2.6, radius: 0.18, body: '#1f2937', band: '#111827', stripe: '#22d3ee', boosters: false, boosterColor: '#1f2937' },
-  'rideshare-leo': { height: 4, radius: 0.28, body: '#f8fafc', band: '#111827', stripe: '#22d3ee', boosters: false, boosterColor: '#f8fafc' },
-  'rideshare-geo': { height: 4, radius: 0.28, body: '#f8fafc', band: '#111827', stripe: '#a78bfa', boosters: false, boosterColor: '#f8fafc' },
-  'medium-launcher': { height: 4.2, radius: 0.3, body: '#f8fafc', band: '#1e3a8a', stripe: '#ef4444', boosters: true, boosterColor: '#e2e8f0' },
-  'deep-rideshare': { height: 4.6, radius: 0.32, body: '#ea7a1a', band: '#9a4a0c', stripe: '#f8fafc', boosters: true, boosterColor: '#f8fafc' },
-}
 
 /** How long each result plays before onDone (seconds) */
 const DURATION: Record<LaunchKind, number> = {
@@ -71,6 +56,11 @@ const CLIMB = 0.42
 
 const climbY = (t: number) => t * t * CLIMB
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
+/** Ease in and out, so moves start and stop gently */
+const smooth = (n: number) => {
+  const x = clamp01(n)
+  return x * x * (3 - 2 * x)
+}
 
 /* Too heavy: a slow, struggling climb, engines cut out, the rocket falls back */
 const CUT_AT = 3.2
@@ -235,111 +225,10 @@ function Plume({
   )
 }
 
-/* ---------------- launch tower ---------------- */
-
-function Tower({ height }: { height: number }) {
-  const levels = Math.round(height / 0.45)
-  return (
-    <group position={[-1.15, 0.2, 0]}>
-      {[
-        [-0.15, -0.15],
-        [0.15, -0.15],
-        [-0.15, 0.15],
-        [0.15, 0.15],
-      ].map(([x, z], i) => (
-        <mesh key={i} position={[x, height / 2, z]}>
-          <boxGeometry args={[0.04, height, 0.04]} />
-          <meshStandardMaterial color="#b91c1c" metalness={0.5} roughness={0.5} />
-        </mesh>
-      ))}
-      {Array.from({ length: levels }, (_, i) => (
-        <group key={i} position={[0, 0.3 + i * 0.45, 0]}>
-          <mesh>
-            <boxGeometry args={[0.34, 0.03, 0.03]} />
-            <meshStandardMaterial color="#e5e7eb" metalness={0.5} />
-          </mesh>
-          <mesh rotation={[0, Math.PI / 2, 0]}>
-            <boxGeometry args={[0.34, 0.03, 0.03]} />
-            <meshStandardMaterial color="#e5e7eb" metalness={0.5} />
-          </mesh>
-        </group>
-      ))}
-      {/* Access arm to the rocket */}
-      <mesh position={[0.55, height * 0.82, 0]}>
-        <boxGeometry args={[0.8, 0.08, 0.12]} />
-        <meshStandardMaterial color="#9ca3af" metalness={0.6} />
-      </mesh>
-      {/* Warning light on top */}
-      <mesh position={[0, height + 0.08, 0]}>
-        <sphereGeometry args={[0.06, 8, 6]} />
-        <meshBasicMaterial color={[3, 0.5, 0.5]} toneMapped={false} />
-      </mesh>
-    </group>
-  )
-}
-
-/* ---------------- the rocket ---------------- */
-
-function Stage({ look, height, band }: { look: RocketLook; height: number; band?: boolean }) {
-  return (
-    <group>
-      <mesh position={[0, height / 2, 0]}>
-        <cylinderGeometry args={[look.radius, look.radius, height, 24]} />
-        <meshStandardMaterial color={look.body} metalness={0.15} roughness={0.55} />
-      </mesh>
-      {/* Coloured stripe */}
-      <mesh position={[0, height * 0.55, 0]}>
-        <cylinderGeometry args={[look.radius * 1.005, look.radius * 1.005, height * 0.05, 24]} />
-        <meshStandardMaterial color={look.stripe} metalness={0.3} roughness={0.4} emissive={look.stripe} emissiveIntensity={0.15} />
-      </mesh>
-      {band && (
-        <mesh position={[0, height - 0.12, 0]}>
-          <cylinderGeometry args={[look.radius * 1.01, look.radius * 1.01, 0.24, 24]} />
-          <meshStandardMaterial color={look.band} metalness={0.4} roughness={0.5} />
-        </mesh>
-      )}
-    </group>
-  )
-}
-
-function Engines({ look }: { look: RocketLook }) {
-  const n = look.radius > 0.25 ? 5 : 3
-  return (
-    <group>
-      {Array.from({ length: n }, (_, i) => {
-        const a = (i / n) * Math.PI * 2
-        const r = i === 0 && n === 5 ? 0 : look.radius * 0.5
-        return (
-          <mesh key={i} position={[Math.cos(a) * r, -0.12, Math.sin(a) * r]}>
-            <cylinderGeometry args={[0.05, look.radius * 0.28, 0.24, 12, 1, true]} />
-            <meshStandardMaterial color="#374151" metalness={0.9} roughness={0.3} side={DoubleSide} />
-          </mesh>
-        )
-      })}
-    </group>
-  )
-}
-
-function GridFins({ look, y }: { look: RocketLook; y: number }) {
-  return (
-    <group position={[0, y, 0]}>
-      {[0, 1, 2, 3].map((i) => {
-        const a = (i * Math.PI) / 2
-        return (
-          <mesh key={i} position={[Math.cos(a) * (look.radius + 0.06), 0, Math.sin(a) * (look.radius + 0.06)]} rotation={[0, -a, 0]}>
-            <boxGeometry args={[0.12, 0.14, 0.02]} />
-            <meshStandardMaterial color="#4b5563" metalness={0.8} roughness={0.35} />
-          </mesh>
-        )
-      })}
-    </group>
-  )
-}
-
 /** Layered glowing flame cones + a glow sprite; scaled by the scene each frame */
-function Flame({ radius, flameRef }: { radius: number; flameRef: RefObject<Group | null> }) {
+function Flame({ radius, flameRef, y }: { radius: number; flameRef: RefObject<Group | null>; y: number }) {
   return (
-    <group ref={flameRef} position={[0, -0.24, 0]} visible={false}>
+    <group ref={flameRef} position={[0, y, 0]} visible={false}>
       <mesh position={[0, -0.45, 0]} rotation={[Math.PI, 0, 0]}>
         <coneGeometry args={[radius * 1.1, 1.0, 16, 1, true]} />
         <meshBasicMaterial color={[3, 1.1, 0.25]} transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
@@ -383,7 +272,8 @@ function Explosion({ boomRef, look }: { boomRef: RefObject<Group | null>; look: 
 /* ---------------- scene ---------------- */
 
 function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps) {
-  const look = LOOK[rocketId] ?? LOOK['rideshare-leo']
+  const look = ROCKET_LOOK[rocketId] ?? ROCKET_LOOK['rideshare-leo']
+  const top = rocketTop(look)
   const lowerH = look.height * 0.7
   const upperH = look.height * 0.3
 
@@ -401,6 +291,7 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
   const boomAt = useRef<Group>(null)
   const beacon = useRef<Sprite>(null)
   const sky = useRef<ShaderMaterial>(null)
+  const fog = useRef<Fog>(null)
   const ground = useRef<Group>(null)
   const earth = useRef<Group>(null)
   const burning = useRef(false)
@@ -427,11 +318,12 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
   const breakupY = climbY(BREAKUP_AT) + look.height * 0.6
   const impact = underpoweredPath(IMPACT_AT)
 
-  useFrame(({ clock: c }) => {
+  useFrame(({ clock: c }, delta) => {
     const k0 = kind ?? 'perfect'
     const t = startedAt.current === null ? 0 : Math.min(DURATION[k0] + 0.1, c.getElapsedTime() - startedAt.current)
     // Less reliable launches flicker, shake and wobble more
-    const flicker = 0.85 + Math.random() * (0.3 + roughness * 0.5)
+    const now = c.getElapsedTime()
+    const flicker = 1 + (Math.sin(now * 43) * 0.07 + Math.sin(now * 71) * 0.05) * (1 + roughness * 1.5)
     const r = rocket.current
     if (!r) return
     const exploded = flying && k0 === 'explode' && t > BREAKUP_AT
@@ -461,12 +353,19 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
     }
     r.position.set(x, y + 0.2, 0)
     r.rotation.z = tilt
+    // A slow roll on the way up, like real rockets turning onto their heading
+    r.rotation.y = flying && !destroyed ? smooth(t / 6) * 0.7 : 0
     r.visible = !broken
 
     // ---- sky and ground ----
-    const space = destroyed ? 0 : clamp01((t - 1.4) / 3)
+    const space = destroyed ? 0 : smooth((t - 1.4) / 3.2)
     if (sky.current) sky.current.uniforms.uSpace.value = space
     if (ground.current) ground.current.visible = space < 0.98
+    // Morning haze near the ground; it clears as the rocket leaves the air
+    if (fog.current) {
+      fog.current.near = 28 + space * 4000
+      fog.current.far = 95 + space * 20000
+    }
 
     // ---- main engines ----
     const burnUntil = k0 === 'underpowered' ? CUT_AT : SEPARATION_AT
@@ -524,7 +423,7 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
         upperFlame.current.scale.setScalar(flicker * 0.55)
       }
       // Fairing opens, the spacecraft drifts out and turns
-      const open = flying ? clamp01((t - FAIRING_AT) / 0.9) : 0
+      const open = flying ? smooth((t - FAIRING_AT) / 1.2) : 0
       if (fairingL.current && fairingR.current) {
         fairingL.current.rotation.z = open * 1.3
         fairingR.current.rotation.z = -open * 1.3
@@ -532,10 +431,10 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
         fairingR.current.position.x = open * 0.7
       }
       if (craft.current) {
-        const out = flying ? clamp01((t - FAIRING_AT - 0.5) / 2) : 0
+        const out = flying ? smooth((t - FAIRING_AT - 0.5) / 2.4) : 0
         const trouble = flying && (k0 === 'lost-signal' || k0 === 'wrong-orbit') ? Math.max(0, t - TROUBLE_AT) : 0
-        craft.current.position.set(trouble * 0.25, upperH * 0.55 + out * 1.6 - (k0 === 'wrong-orbit' ? trouble * 0.35 : 0), 0)
-        craft.current.scale.setScalar(look.radius * 0.6 + out * 0.4)
+        craft.current.position.set(trouble * 0.25, upperH * 0.7 + out * 1.9 - (k0 === 'wrong-orbit' ? trouble * 0.35 : 0), 0)
+        craft.current.scale.setScalar(look.radius * 0.55 + out * 0.5)
         craft.current.rotation.set(trouble * 1.6, t * 0.8 + trouble * 1.1, trouble * 0.9)
       }
       // Signal lost: a red warning light blinks on the silent spacecraft
@@ -555,24 +454,28 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
     // Camera follows the rocket. The player can hold and drag to orbit around it
     // (OrbitControls); we only move the view along with the rocket and, while
     // they're not dragging, ease it to a distance that fits the scene.
+    // Aim a little below the middle, so the rocket sits above the bottom panel
+    const mid = top * 0.38
+    // Wide for the climb, then move in close to watch the spacecraft come out
+    const closeUp = destroyed ? 0 : smooth((t - FAIRING_AT + 0.4) / 2.5)
+    const craftY = lowerH + upperH * 0.7 + 1.3
     const focusY =
-      k0 === 'explode'
-        ? Math.min(y, climbY(BREAKUP_AT)) + look.height * 0.55
-        : k0 === 'underpowered'
-          ? Math.max(1.6, y + look.height * 0.45)
-          : y + look.height * 0.55
-    const dist = (7.8 + (destroyed ? 0 : clamp01(t / 4) * 1.8)) * portrait
-    const shakeBase = burning.current && t < 2.5 ? (2.5 - t) * (0.02 + roughness * 0.05) : 0
-    const shake = shakeBase + (broken && k < 0.6 ? (0.6 - k) * 0.3 : 0)
-    focus.set(x * 0.6 + (Math.random() - 0.5) * shake, focusY + (Math.random() - 0.5) * shake, 0)
+      k0 === 'explode' ? Math.min(y, climbY(BREAKUP_AT)) + mid : k0 === 'underpowered' ? Math.max(1.6, y + mid * 0.8) : y + mid + closeUp * (craftY - mid)
+    const dist = Math.max(7, top * 1.85 + (destroyed ? 0 : smooth(t / 4) * 1.8)) * (1 - closeUp * 0.52) * portrait
+    // Rumble: smooth waves (not random jumps), strongest at liftoff and for rough rides
+    const rumble = burning.current && t < 3 ? (3 - t) * (0.012 + roughness * 0.035) : 0
+    const shake = rumble + (broken && k < 0.6 ? (0.6 - k) * 0.25 : 0)
+    focus.set(x * 0.6 + Math.sin(now * 37) * shake, focusY + Math.sin(now * 29 + 1.3) * shake, 0)
     const ctl = controls.current
     if (!placed.current) {
-      camera.position.set(dist * 0.45, focusY + 0.4, dist)
-      placed.current = true
+      camera.position.set(dist * 0.5, focusY + 0.5, dist * 0.87)
+      ctl?.target.copy(focus)
+      placed.current = !!ctl
     }
     if (ctl) {
       offset.copy(camera.position).sub(ctl.target)
-      if (!userDragging.current) offset.setLength(offset.length() + (dist - offset.length()) * 0.05)
+      // Frame-rate independent glide to the framing distance
+      if (!userDragging.current) offset.setLength(MathUtils.damp(offset.length(), dist, 2.5, delta))
       ctl.target.copy(focus)
       camera.position.copy(focus).add(offset)
       ctl.update()
@@ -595,18 +498,19 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
       <Glow strength={1.1} />
       <Stars radius={100} depth={30} count={1500} factor={4} saturation={0.3} fade speed={0.3} />
       <Sun position={[30, 25, -40]} size={10} />
-      <hemisphereLight args={['#bae6fd', '#3f6212', 0.6]} />
+      <fog ref={fog} attach="fog" args={['#f1cfa6', 28, 95]} />
+      <hemisphereLight args={['#bae6fd', '#4d6b2a', 0.75]} />
       <directionalLight
         position={[7, 9, 5]}
         intensity={2.6}
         color="#fff4dc"
         castShadow
-        shadow-mapSize={[1024, 1024]}
-        shadow-bias={-0.0004}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0003}
         shadow-normalBias={0.03}
-        shadow-camera-left={-7}
-        shadow-camera-right={7}
-        shadow-camera-top={9}
+        shadow-camera-left={-9}
+        shadow-camera-right={9}
+        shadow-camera-top={11}
         shadow-camera-bottom={-4}
         shadow-camera-near={1}
         shadow-camera-far={40}
@@ -631,93 +535,58 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
       </group>
 
       <group ref={shadowRoot}>
-      {/* Ground, pad and tower */}
-      <group ref={ground}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[40, 32]} />
-          <meshStandardMaterial map={groundTexture()} roughness={1} />
-        </mesh>
-        <mesh position={[0, 0.1, 0]}>
-          <boxGeometry args={[3, 0.2, 3]} />
-          <meshStandardMaterial map={concreteTexture()} roughness={0.9} />
-        </mesh>
-        <Tower height={look.height * 1.1} />
-        {/* Lightning masts */}
-        {[
-          [3, -2],
-          [-3, -2.5],
-          [2.5, 3],
-        ].map(([x, z], i) => (
-          <mesh key={i} position={[x, look.height * 0.7, z]}>
-            <cylinderGeometry args={[0.03, 0.05, look.height * 1.4, 6]} />
-            <meshStandardMaterial color="#d1d5db" metalness={0.6} />
-          </mesh>
-        ))}
-      </group>
+        <group ref={ground}>
+          <LaunchSite rocketHeight={top} />
+        </group>
 
-      {/* Exhaust: glowing trail and smoke, both left behind in the air */}
-      <Plume emitter={nozzle} active={burning} count={40} kind="fire" />
-      <Plume emitter={nozzle} active={burning} count={70} kind="smoke" />
+        {/* Exhaust: glowing trail and smoke, both left behind in the air */}
+        <Plume emitter={nozzle} active={burning} count={40} kind="fire" />
+        <Plume emitter={nozzle} active={burning} count={80} kind="smoke" />
 
-      {/* Rocket */}
-      <group ref={rocket} position={[0, 0.2, 0]}>
-        <group ref={lower}>
-          <group position={[0, 0.25, 0]}>
-            <Stage look={look} height={lowerH - 0.25} band />
-            <GridFins look={look} y={lowerH - 0.45} />
-            <Engines look={look} />
+        <group ref={rocket} position={[0, 0.2, 0]}>
+          {/* First stage */}
+          <group ref={lower}>
+            <group position={[0, 0.3, 0]}>
+              <StageBody look={look} height={lowerH - 0.3} band />
+              <GridFins look={look} y={lowerH - 0.6} />
+              <EngineCluster radius={look.radius} big={look.radius > 0.25} />
+            </group>
+            {look.boosters &&
+              [-1, 1].map((side) => (
+                <group key={side} position={[side * look.radius * 1.6, 0.3, 0]}>
+                  <Booster look={look} height={lowerH * 0.7} />
+                </group>
+              ))}
+            <group ref={nozzle} />
+            <Flame radius={look.radius * (look.boosters ? 2.2 : 1.1)} flameRef={flame} y={0.06} />
+            <pointLight ref={engineLight} position={[0, -0.4, 0]} color="#ff9a3c" distance={9} intensity={0} />
           </group>
-          {look.boosters &&
-            [-1, 1].map((s) => (
-              <group key={s} position={[s * look.radius * 1.65, 0.25, 0]}>
-                <mesh position={[0, lowerH * 0.4, 0]}>
-                  <cylinderGeometry args={[look.radius * 0.55, look.radius * 0.55, lowerH * 0.8, 16]} />
-                  <meshStandardMaterial color={look.boosterColor} metalness={0.25} roughness={0.4} />
-                </mesh>
-                <mesh position={[0, lowerH * 0.8 + 0.18, 0]}>
-                  <coneGeometry args={[look.radius * 0.55, 0.36, 16]} />
-                  <meshStandardMaterial color={look.boosterColor} metalness={0.25} roughness={0.4} />
-                </mesh>
+
+          {/* Second stage, with the spacecraft inside the nose fairing */}
+          <group position={[0, lowerH, 0]}>
+            <StageBody look={look} height={upperH * 0.5} />
+            <VacuumEngine radius={look.radius} />
+            <Flame radius={look.radius * 0.6} flameRef={upperFlame} y={-0.3} />
+
+            <group ref={craft} position={[0, upperH * 0.7, 0]}>
+              <CraftModel design={design} />
+              <sprite ref={beacon} position={[0, 1, 0]} scale={1.4} visible={false}>
+                <spriteMaterial map={glowTexture()} color={[4, 0.4, 0.4]} transparent blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+              </sprite>
+            </group>
+
+            {(
+              [
+                [fairingL, -1],
+                [fairingR, 1],
+              ] as const
+            ).map(([ref, side]) => (
+              <group key={side} ref={ref} position={[0, upperH * 0.5, 0]}>
+                <FairingHalf look={look} side={side} tube={upperH} />
               </group>
             ))}
-          <group ref={nozzle} />
-          <Flame radius={look.radius * (look.boosters ? 2.2 : 1.1)} flameRef={flame} />
-          <pointLight ref={engineLight} position={[0, -0.6, 0]} color="#ff9a3c" distance={8} intensity={0} />
-        </group>
-
-        <group position={[0, lowerH, 0]}>
-          <Stage look={look} height={upperH * 0.5} />
-          <Flame radius={look.radius * 0.6} flameRef={upperFlame} />
-
-          {/* The spacecraft inside the fairing */}
-          <group ref={craft} position={[0, upperH * 0.55, 0]}>
-            <CraftModel design={design} />
-            <sprite ref={beacon} position={[0, 1, 0]} scale={1.4} visible={false}>
-              <spriteMaterial map={glowTexture()} color={[4, 0.4, 0.4]} transparent blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
-            </sprite>
           </group>
-
-          {/* Fairing halves (right half: angles 0..π, left half: π..2π), hinged at the bottom */}
-          {(
-            [
-              [fairingL, -1],
-              [fairingR, 1],
-            ] as const
-          ).map(([ref, side]) => (
-            <group key={side} ref={ref} position={[0, upperH * 0.5, 0]}>
-              <mesh position={[0, upperH * 0.5, 0]}>
-                <cylinderGeometry args={[look.radius * 1.15, look.radius * 1.15, upperH, 24, 1, true, side === 1 ? 0 : Math.PI, Math.PI]} />
-                <meshStandardMaterial color="#f8fafc" metalness={0.2} roughness={0.35} side={DoubleSide} />
-              </mesh>
-              <mesh position={[0, upperH + 0.28, 0]}>
-                <coneGeometry args={[look.radius * 1.15, 0.56, 24, 1, true, side === 1 ? 0 : Math.PI, Math.PI]} />
-                <meshStandardMaterial color="#f8fafc" metalness={0.2} roughness={0.35} side={DoubleSide} />
-              </mesh>
-            </group>
-          ))}
         </group>
-      </group>
-
       </group>
 
       {/* Explosion: in the air, or where the falling rocket hits the ground */}

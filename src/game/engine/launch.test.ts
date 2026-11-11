@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rocketById } from '../data'
 import type { MissionDesign } from '../types'
-import { failureChance, holdLabel, launchOdds, launchRisk, missionOutlook, rollLaunch } from './launch'
+import { failureChance, holdLabel, launchOdds, launchRisk, missionOutlook, rollLaunch, withLaunchDefaults } from './launch'
 
 const GOOD: MissionDesign = {
   planner: { scenarioId: 'earth-watch', difficulty: 'engineer', targetLifetimeMonths: 12, targetCoverage: 0.5 },
@@ -96,5 +96,17 @@ describe('missionOutlook', () => {
     const out = missionOutlook(GOOD)
     expect(out.checks).toHaveLength(5)
     expect(out.checks.every((c) => c.text.length > 10)).toBe(true)
+  })
+})
+
+describe('withLaunchDefaults', () => {
+  it('picks an orbit and a rocket that can carry the spacecraft when none are chosen', () => {
+    const d = withLaunchDefaults(withComms({ orbitId: null, launchVehicleId: null }))
+    expect(d.comms.orbitId).toBe('leo')
+    expect(d.comms.launchVehicleId).toBe('rideshare-leo')
+  })
+
+  it('keeps the player’s own choices', () => {
+    expect(withLaunchDefaults(GOOD)).toBe(GOOD)
   })
 })

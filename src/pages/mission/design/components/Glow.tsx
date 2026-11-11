@@ -15,7 +15,7 @@ export default function Glow({ strength = 1 }: { strength?: number }) {
     <>
       <PerformanceMonitor onDecline={() => setOn(false)} />
       {on && (
-        <EffectComposer multisampling={0}>
+        <EffectComposer multisampling={4}>
           <Bloom mipmapBlur intensity={strength} luminanceThreshold={1} luminanceSmoothing={0.25} />
           <Vignette offset={0.3} darkness={0.55} />
         </EffectComposer>
