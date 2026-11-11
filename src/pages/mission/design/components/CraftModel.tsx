@@ -57,6 +57,7 @@ function Box({
   rough = 0.45,
   map,
   edges,
+  glow,
 }: {
   size: [number, number, number]
   position?: [number, number, number]
@@ -66,6 +67,8 @@ function Box({
   rough?: number
   map?: Texture
   edges?: string
+  /** Emissive strength; above ~1.5 it blooms */
+  glow?: number
 }) {
   return (
     <mesh position={position}>
@@ -76,7 +79,7 @@ function Box({
         metalness={metal}
         roughness={rough}
         emissive={emissive ?? '#000'}
-        emissiveIntensity={emissive ? 0.8 : 0}
+        emissiveIntensity={emissive ? (glow ?? 0.8) : 0}
       />
       {edges && <Edges color={edges} />}
     </mesh>
@@ -192,6 +195,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
             position={[0, bottom + 0.3, back - 0.04]}
             color="#065f46"
             emissive={COLORS.battery}
+            glow={1.6}
             edges={COLORS.battery}
           />
         </PopIn>
@@ -206,7 +210,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
             color={COLORS.dark}
             edges={COLORS.led}
           />
-          <Box size={[0.05, 0.03, 0.05]} position={[sx * 0.2, top + 0.1, 0]} color={COLORS.led} emissive={COLORS.led} />
+          <Box size={[0.05, 0.03, 0.05]} position={[sx * 0.2, top + 0.1, 0]} color={COLORS.led} emissive={COLORS.led} glow={5} />
         </PopIn>
       )}
 
