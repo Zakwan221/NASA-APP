@@ -1,16 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, CircleCheck, Rocket, Rotate3d, TriangleAlert } from 'lucide-react'
+import { ChevronLeft, CircleCheck, Lock, Rocket, Rotate3d, TriangleAlert } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { INSTRUMENTS, ORBITS, partById, partsIn, ROCKETS } from '../../../game/data'
 import { evaluate } from '../../../game/engine/evaluate'
 import { failureChance } from '../../../game/engine/launch'
 import type { Part } from '../../../game/types'
-import { useMission } from '../../../store/missionStore'
 import { BUILD_STEPS, stepDone, type Slot } from './buildSteps'
 import { DndProvider, DropZone, type DragItem } from './components/dnd'
 import ItemPicture from '../../../components/space/ItemPicture'
 import OptionCard from './components/OptionCard'
 import { WarningList } from './components/Warnings'
+import { ROLE_NAMES, useDesignEditor } from './editor'
 
 const CraftScene = lazy(() => import('./components/CraftScene'))
 // Renders a picture of every part in the background (pulls in three.js, so lazy)
@@ -59,13 +59,16 @@ export default function Builder({
   onStep,
   onExit,
   onFinish,
+  finishLabel = 'To the launch pad',
 }: {
   step: number
   onStep: (step: number) => void
   onExit: () => void
   onFinish: () => void
+  /** Team play: "Vote: launch pad" */
+  finishLabel?: string
 }) {
-  const store = useMission()
+  const store = useDesignEditor()
   const { design } = store
   const ev = useMemo(() => evaluate(design), [design])
   const [showProblems, setShowProblems] = useState(false)
@@ -87,15 +90,18 @@ export default function Builder({
 
   const selectedId = (slot: Slot) => (slot === 'radio' ? design.comms.radioId : design.engineer[slot])
   const select = (slot: Slot, id: string) => (slot === 'radio' ? store.setRadio(id) : store.setPart(slot, id))
+  // Team play: each step belongs to one role; the others watch it change live
+  const editable = store.canEdit(current.section)
+  const owner = store.owner(current.section)
 
   /** A part or instrument dropped on the 3D spacecraft goes into its slot */
   const fit = (item: DragItem) => {
     if (item.kind === 'instrument') {
-      if (!design.science.instrumentIds.includes(item.id)) store.toggleInstrument(item.id)
+      if (store.canEdit('science') && !design.science.instrumentIds.includes(item.id)) store.toggleInstrument(item.id)
       return
     }
-    const s = BUILD_STEPS.find((b) => b.category === partById(item.id)?.category)?.slot
-    if (s) select(s, item.id)
+    const target = BUILD_STEPS.find((b) => b.category === partById(item.id)?.category)
+    if (target?.slot && store.canEdit(target.section)) select(target.slot, item.id)
   }
 
   // "Pick a …" reminders are not problems: skipped steps already show as not done
@@ -114,6 +120,7 @@ export default function Builder({
           name={p.name}
           selected={selectedId(current.slot!) === p.id}
           onSelect={() => select(current.slot!, p.id)}
+          disabled={!editable}
           stats={partStats(p)}
           explain={p.explain}
           source={p.source}
@@ -131,6 +138,7 @@ export default function Builder({
           name={i.name}
           selected={design.science.instrumentIds.includes(i.id)}
           onSelect={() => store.toggleInstrument(i.id)}
+          disabled={!editable}
           dragItem={{ kind: 'instrument', id: i.id, name: i.name }}
           picture={<ItemPicture thumb={`instrument:${i.id}`} alt={i.name} />}
           stats={[
@@ -162,6 +170,7 @@ export default function Builder({
             name={o.name}
             selected={design.comms.orbitId === o.id}
             onSelect={() => store.setOrbit(o.id)}
+            disabled={!editable}
             picture={<ItemPicture orbit={o.id} alt={o.name} />}
             stats={[
               { label: 'Sees target', value: pct(view) },
@@ -185,6 +194,7 @@ export default function Builder({
           name={r.name}
           selected={design.comms.launchVehicleId === r.id}
           onSelect={() => store.setRocket(r.id)}
+          disabled={!editable}
           picture={<ItemPicture thumb={`rocket:${r.id}`} alt={r.name} />}
           stats={[
             { label: 'Works', value: `${pct(1 - failureChance(r, difficulty))} of the time` },
@@ -283,6 +293,25 @@ export default function Builder({
                   {current.title}
                 </h2>
                 <p className="mt-1 text-sm text-slate-300">{current.hint}</p>
+                {owner && (
+                  <p
+                    className={`mt-2 flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm ${
+                      editable ? 'bg-cyan-300/10 text-cyan-100' : 'bg-white/[0.06] text-slate-300'
+                    }`}
+                  >
+                    {editable ? (
+                      <>
+                        <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-cyan-300" /> Your call, {ROLE_NAMES[current.section]}.
+                        The crew sees every change.
+                      </>
+                    ) : (
+                      <>
+                        <Lock aria-hidden="true" className="size-4 shrink-0 text-slate-400" /> {owner} chooses this. Watch it change live,
+                        and talk it through together.
+                      </>
+                    )}
+                  </p>
+                )}
               </header>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -341,7 +370,7 @@ export default function Builder({
               >
                 {last ? (
                   <>
-                    To the launch pad <Rocket aria-hidden="true" className="ml-1 inline size-4" />
+                    {finishLabel} <Rocket aria-hidden="true" className="ml-1 inline size-4" />
                   </>
                 ) : stepDone(design, current) ? (
                   'Next →'

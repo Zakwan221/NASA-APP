@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
-import { Check, Earth, FlaskConical, GraduationCap, Medal, Orbit, Rocket, Sun, Wrench, type LucideIcon } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { Check, Earth, FlaskConical, GraduationCap, Lock, Medal, Orbit, Rocket, Sun, Wrench, type LucideIcon } from 'lucide-react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { SCENARIOS } from '../../../game/data'
 import { evaluate, limitsFor } from '../../../game/engine/evaluate'
@@ -9,6 +9,7 @@ import { useMission } from '../../../store/missionStore'
 import Builder from './Builder'
 import { BUILD_STEPS, stepDone } from './buildSteps'
 import PhaseSteps from './components/PhaseSteps'
+import { useDesignEditor } from './editor'
 
 const DIFFICULTIES: { id: Difficulty; label: string; icon: LucideIcon; text: string }[] = [
   { id: 'cadet', label: 'Cadet', icon: GraduationCap, text: 'Simple parts, a big budget, and rockets never fail.' },
@@ -37,8 +38,19 @@ const SCENARIO_ART: Record<string, { icon: LucideIcon; color: string; gradient: 
  * "Start building" opens the full-screen 3D builder, one step at a time.
  * The builder step lives in the URL (?build=2) so the phone's Back button works.
  */
-export default function DesignPage() {
-  const store = useMission()
+export default function DesignPage({
+  onLaunchPad,
+  launchLabel,
+  intro,
+}: {
+  /** Team play: ask the crew to move to the launch pad (solo goes straight there) */
+  onLaunchPad?: () => void
+  launchLabel?: string
+  /** Team play: shown above the briefing (crew and vote) */
+  intro?: ReactNode
+} = {}) {
+  const store = useDesignEditor()
+  const solo = useMission()
   const { design } = store
   const navigate = useNavigate()
   const location = useLocation()
@@ -47,10 +59,14 @@ export default function DesignPage() {
 
   // Coming from the Report's Redesign button: the next flight needs a new launch
   const redesign = (location.state as { redesign?: boolean } | null)?.redesign
-  const { setLaunch } = store
+  const { setLaunch } = solo
   useEffect(() => {
-    if (redesign) setLaunch(null)
-  }, [redesign, setLaunch])
+    if (redesign && !store.team) setLaunch(null)
+  }, [redesign, setLaunch, store.team])
+  const toLaunchPad = onLaunchPad ?? (() => navigate('/mission/launch'))
+  // Team play: only the Mission Planner (or the host, if nobody is) sets the mission
+  const canPlan = store.canEdit('planner')
+  const planner = store.owner('planner')
 
   const scenarioId = design.planner.scenarioId
   const difficulty = design.planner.difficulty
@@ -68,7 +84,7 @@ export default function DesignPage() {
   }
 
   if (step !== null && scenarioId) {
-    return <Builder step={step} onStep={goStep} onExit={() => setParams({})} onFinish={() => navigate('/mission/launch')} />
+    return <Builder step={step} onStep={goStep} onExit={() => setParams({})} onFinish={toLaunchPad} finishLabel={launchLabel} />
   }
 
   return (
@@ -79,7 +95,18 @@ export default function DesignPage() {
         <p className="mt-2 max-w-2xl text-slate-300">
           Choose what your spacecraft will do and how hard the game should be. Then build it piece by piece in 3D.
         </p>
+        {planner && (
+          <p
+            className={`mt-3 flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
+              canPlan ? 'bg-cyan-300/10 text-cyan-100' : 'bg-white/[0.06] text-slate-300'
+            }`}
+          >
+            {canPlan ? <Check aria-hidden="true" className="size-4 text-cyan-300" /> : <Lock aria-hidden="true" className="size-4" />}
+            {canPlan ? 'You set the mission. Everyone sees your choices live.' : `${planner} sets the mission. You can see it change live.`}
+          </p>
+        )}
       </header>
+      {intro}
 
       <section aria-labelledby="mission-h">
         <h2 id="mission-h" className="text-xl font-bold">
@@ -95,6 +122,7 @@ export default function DesignPage() {
                 type="button"
                 role="radio"
                 aria-checked={selected}
+                disabled={!canPlan}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => {
                   store.setScenario(s.id)
@@ -143,6 +171,7 @@ export default function DesignPage() {
               type="button"
               role="radio"
               aria-checked={difficulty === d.id}
+              disabled={!canPlan}
               onClick={() => {
                 store.setDifficulty(d.id)
                 const min = limitsFor(ev.scenario, d.id).minLifetimeMonths
@@ -170,7 +199,7 @@ export default function DesignPage() {
               type="button"
               aria-label="Fewer months"
               onClick={() => store.setLifetime(Math.max(limits.minLifetimeMonths, lifetime - 3))}
-              disabled={lifetime <= limits.minLifetimeMonths}
+              disabled={!canPlan || lifetime <= limits.minLifetimeMonths}
               className="size-11 rounded-full bg-white/10 text-xl font-bold hover:bg-white/15 disabled:opacity-40"
             >
               −
@@ -180,7 +209,7 @@ export default function DesignPage() {
               type="button"
               aria-label="More months"
               onClick={() => store.setLifetime(Math.min(60, lifetime + 3))}
-              disabled={lifetime >= 60}
+              disabled={!canPlan || lifetime >= 60}
               className="size-11 rounded-full bg-white/10 text-xl font-bold hover:bg-white/15 disabled:opacity-40"
             >
               +
@@ -208,21 +237,25 @@ export default function DesignPage() {
             <Rocket aria-hidden="true" className="ml-2 inline size-5" />
           )}
         </motion.button>
-        {!scenarioId && <p className="text-sm text-slate-400">Choose a mission first.</p>}
+        {!scenarioId && (
+          <p className="text-sm text-slate-400">{canPlan ? 'Choose a mission first.' : `Waiting for ${planner ?? 'the planner'} to choose a mission.`}</p>
+        )}
         {started && (
           <>
             {ev.designReady && (
               <button
                 type="button"
-                onClick={() => navigate('/mission/launch')}
+                onClick={toLaunchPad}
                 className="min-h-12 rounded-full border border-white/20 px-6 font-semibold hover:bg-white/10"
               >
-                Skip to launch →
+                {launchLabel ?? 'Skip to launch'} →
               </button>
             )}
-            <button type="button" onClick={store.reset} className="min-h-11 text-sm font-semibold text-slate-400 hover:text-slate-200">
+            {!store.team && (
+            <button type="button" onClick={solo.reset} className="min-h-11 text-sm font-semibold text-slate-400 hover:text-slate-200">
               Start over
             </button>
+            )}
           </>
         )}
       </div>

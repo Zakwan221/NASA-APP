@@ -16,6 +16,7 @@ export default function ReportScreen({
   team = false,
   previousTotal,
   footer,
+  flyAgainLabel = 'Fly again',
 }: {
   craft: FlightSpacecraft
   state: OperateState
@@ -26,6 +27,8 @@ export default function ReportScreen({
   previousTotal?: number | null
   /** Extra content under the stats, e.g. the team leaderboard */
   footer?: ReactNode
+  /** Team mode: "Redesign together" */
+  flyAgainLabel?: string
 }) {
   const summary = useMemo(() => summarize(craft, state), [craft, state])
   // Recomputed if late moves arrive, so every phone shows the same score
@@ -142,7 +145,7 @@ export default function ReportScreen({
           onClick={onFlyAgain}
           className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
         >
-          Fly again
+          {flyAgainLabel}
             </button>
             <p className="mt-2 text-sm text-slate-400">Change your strategy and try to beat {score.total}.</p>
           </>
