@@ -18,6 +18,7 @@ export default function OptionCard({
   badge,
   multi = false,
   dragItem,
+  picture,
 }: {
   name: string
   selected: boolean
@@ -32,6 +33,8 @@ export default function OptionCard({
   multi?: boolean
   /** Makes the card draggable onto the spacecraft */
   dragItem?: DragItem
+  /** A picture of the item, shown at the top so players know what it is */
+  picture?: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const main = stats.slice(0, 3)
@@ -42,6 +45,11 @@ export default function OptionCard({
         selected ? 'border-cyan-300/70 bg-cyan-300/5' : disabled ? 'opacity-50' : 'hover:border-white/25'
       }`}
     >
+      {picture && (
+        <button type="button" onClick={onSelect} disabled={disabled} tabIndex={-1} aria-hidden="true" className="mb-3 block w-full">
+          {picture}
+        </button>
+      )}
       <button
         type="button"
         onClick={onSelect}

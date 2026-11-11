@@ -8,10 +8,13 @@ import type { Part } from '../../../game/types'
 import { useMission } from '../../../store/missionStore'
 import { BUILD_STEPS, stepDone, type Slot } from './buildSteps'
 import { DndProvider, DropZone, type DragItem } from './components/dnd'
+import ItemPicture from '../../../components/space/ItemPicture'
 import OptionCard from './components/OptionCard'
 import { WarningList } from './components/Warnings'
 
 const CraftScene = lazy(() => import('./components/CraftScene'))
+// Renders a picture of every part in the background (pulls in three.js, so lazy)
+const ThumbnailStudio = lazy(() => import('../../../components/space/thumbnails'))
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
@@ -114,6 +117,7 @@ export default function Builder({
           stats={partStats(p)}
           explain={p.explain}
           source={p.source}
+          picture={<ItemPicture thumb={`part:${p.id}`} alt={p.name} />}
           dragItem={{ kind: 'part', id: p.id, name: p.name }}
           badge={p.tier === 'advanced' && <Badge tone="violet">Advanced</Badge>}
         />
@@ -128,6 +132,7 @@ export default function Builder({
           selected={design.science.instrumentIds.includes(i.id)}
           onSelect={() => store.toggleInstrument(i.id)}
           dragItem={{ kind: 'instrument', id: i.id, name: i.name }}
+          picture={<ItemPicture thumb={`instrument:${i.id}`} alt={i.name} />}
           stats={[
             { label: 'Science', value: `${i.scienceValue}/day` },
             { label: 'Cost', value: `$${i.costM} M` },
@@ -157,6 +162,7 @@ export default function Builder({
             name={o.name}
             selected={design.comms.orbitId === o.id}
             onSelect={() => store.setOrbit(o.id)}
+            picture={<ItemPicture orbit={o.id} alt={o.name} />}
             stats={[
               { label: 'Sees target', value: pct(view) },
               { label: 'Contact', value: o.contactMinPerDay >= 1440 ? 'All day' : `${o.contactMinPerDay} min/day` },
@@ -179,6 +185,7 @@ export default function Builder({
           name={r.name}
           selected={design.comms.launchVehicleId === r.id}
           onSelect={() => store.setRocket(r.id)}
+          picture={<ItemPicture thumb={`rocket:${r.id}`} alt={r.name} />}
           stats={[
             { label: 'Works', value: `${pct(1 - failureChance(r, difficulty))} of the time` },
             { label: 'Cost', value: `$${r.costM} M` },
@@ -202,6 +209,9 @@ export default function Builder({
 
   return (
     <DndProvider>
+      <Suspense fallback={null}>
+        <ThumbnailStudio />
+      </Suspense>
       <div className="fixed inset-0 z-[60] flex flex-col bg-space-950 lg:flex-row" role="dialog" aria-label="Spacecraft builder">
         {/* 3D view */}
         <DropZone onDrop={fit} className="min-h-0 flex-1">

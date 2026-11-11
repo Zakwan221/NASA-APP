@@ -18,6 +18,7 @@ src/
 ├── App.tsx                  # routes
 ├── main.tsx
 ├── index.css                # Tailwind + theme colors/fonts
+├── assets/space/            # NASA Earth textures + HDRI (credits in CREDITS.md)
 ├── lib/
 │   ├── nasa.ts              # shared NASA API calls (APOD, asteroids) + 1h cache
 │   └── supabase.ts          # shared Supabase client + anonymous sign-in
@@ -27,14 +28,16 @@ src/
 │   ├── navbar/              # top navbar (Navbar, Logo, navLinks)
 │   ├── footer/
 │   ├── layout/              # Navbar + page + Footer shell
-│   └── ui/                  # Section, Skeleton, ComingSoon, ErrorMessage...
+│   ├── ui/                  # Section, Skeleton, ComingSoon, ErrorMessage...
+│   └── space/               # shared 3D: Earth, Sun, spacecraft + rocket models, item pictures, glow
 └── pages/
     ├── home/                # Module 1 – Home page  ("/")
     │   ├── HomePage.tsx
     │   └── components/      # SolarStory (scroll 3D: Earth → spacecraft → solar system), AsteroidStat, ApodSection, HowItWorks
-    ├── info/                # Module 2 – NASA stories ("/info")
+    ├── info/                # Module 2 – How to play, a scroll-driven 3D guide ("/info")
     │   ├── InfoPage.tsx
-    │   └── components/
+    │   ├── guideContent.ts  # all the guide text (easy to edit)
+    │   └── components/      # GuideStory (screens), GuideScene (3D)
     └── games/               # Module 3 – multiplayer quiz ("/games")
         ├── GamesPage.tsx
         ├── api/quizApi.ts   # typed calls to the quiz functions + realtime
