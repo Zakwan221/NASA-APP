@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import {
   AdditiveBlending,
   BackSide,
+  DoubleSide,
   MathUtils,
   NormalBlending,
   Vector3,
@@ -161,11 +162,12 @@ function Plume({
       for (let i = 0; i < spawn; i++) {
         const p = parts[next.current]
         next.current = (next.current + 1) % parts.length
-        const nearGround = at.y < 1.2
+        const nearGround = at.y < 1.6
         p.pos.copy(at)
         p.age = 0
-        p.life = fire ? 0.35 + Math.random() * 0.2 : 2.2 + Math.random() * 1.5
-        p.size = fire ? 0.9 + Math.random() * 0.5 : 0.8 + Math.random() * 0.6
+        // Steam from the water deluge at the pad lingers longer and billows bigger
+        p.life = fire ? 0.35 + Math.random() * 0.2 : nearGround ? 3.5 + Math.random() * 2 : 2.2 + Math.random() * 1.5
+        p.size = fire ? 0.9 + Math.random() * 0.5 : nearGround ? 1.3 + Math.random() * 1 : 0.8 + Math.random() * 0.6
         if (nearGround) {
           const a = Math.random() * Math.PI * 2
           const s = fire ? 2 : 1.4 + Math.random() * 1.2
@@ -225,21 +227,150 @@ function Plume({
   )
 }
 
-/** Layered glowing flame cones + a glow sprite; scaled by the scene each frame */
+/* ---------------- exhaust plume ---------------- */
+
+const PLUME_VERT = /* glsl */ `
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  varying vec3 vView;
+  void main() {
+    vUv = uv;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vNormal = normalize(normalMatrix * normal);
+    vView = normalize(-mv.xyz);
+    gl_Position = projectionMatrix * mv;
+  }
+`
+
+/**
+ * Glowing exhaust: white-hot at the nozzle, through yellow and orange, fading
+ * out at the tail. Bright "shock diamonds" near the nozzle, a fast shimmer,
+ * and soft edges (the sides facing away from the camera fade out).
+ * Colours are brighter than white so the glow pass makes them bloom.
+ */
+const PLUME_FRAG = /* glsl */ `
+  uniform float uTime;
+  uniform float uPower;
+  uniform vec3 uHot;
+  uniform vec3 uCool;
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  varying vec3 vView;
+  void main() {
+    float v = 1.0 - vUv.y;                       // 0 at the nozzle, 1 at the tail
+    float body = pow(1.0 - v, 1.6);
+    float diamonds = exp(-v * 5.0) * pow(0.5 + 0.5 * cos(v * 55.0 - uTime * 6.0), 6.0);
+    float shimmer = 0.82 + 0.18 * sin(v * 38.0 - uTime * 42.0 + vUv.x * 18.0);
+    float edge = pow(abs(dot(vNormal, vView)), 1.4);
+    vec3 col = mix(uHot, uCool, smoothstep(0.05, 0.7, v));
+    float a = (body * shimmer + diamonds * 1.4) * edge * uPower;
+    // Additive blending already multiplies by alpha, so the colour stays unscaled here
+    gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
+  }
+`
+
+function PlumeLayer({
+  r0,
+  r1,
+  length,
+  hot,
+  cool,
+  power,
+}: {
+  r0: number
+  r1: number
+  length: number
+  hot: [number, number, number]
+  cool: [number, number, number]
+  power: number
+}) {
+  const mat = useRef<ShaderMaterial>(null)
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uPower: { value: power },
+      uHot: { value: new Vector3(...hot) },
+      uCool: { value: new Vector3(...cool) },
+    }),
+    [power, hot, cool],
+  )
+  useFrame(({ clock }) => {
+    if (mat.current) mat.current.uniforms.uTime.value = clock.getElapsedTime()
+  })
+  return (
+    <mesh position={[0, -length / 2, 0]}>
+      <cylinderGeometry args={[r0, r1, length, 32, 1, true]} />
+      <shaderMaterial
+        ref={mat}
+        uniforms={uniforms}
+        vertexShader={PLUME_VERT}
+        fragmentShader={PLUME_FRAG}
+        transparent
+        depthWrite={false}
+        blending={AdditiveBlending}
+        side={DoubleSide}
+        toneMapped={false}
+      />
+    </mesh>
+  )
+}
+
+const HOT: [number, number, number] = [4, 3.6, 2.6]
+const MID: [number, number, number] = [3.2, 1.5, 0.35]
+const COOL: [number, number, number] = [1.6, 0.45, 0.08]
+
+/**
+ * The flame under an engine: a short white-hot core inside a long orange plume,
+ * plus a glow. The scene scales it each frame (longer and wider as the air thins).
+ */
 function Flame({ radius, flameRef, y }: { radius: number; flameRef: RefObject<Group | null>; y: number }) {
   return (
     <group ref={flameRef} position={[0, y, 0]} visible={false}>
-      <mesh position={[0, -0.45, 0]} rotation={[Math.PI, 0, 0]}>
-        <coneGeometry args={[radius * 1.1, 1.0, 16, 1, true]} />
-        <meshBasicMaterial color={[3, 1.1, 0.25]} transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, -0.3, 0]} rotation={[Math.PI, 0, 0]}>
-        <coneGeometry args={[radius * 0.6, 0.65, 16, 1, true]} />
-        <meshBasicMaterial color={[4, 3.4, 1.8]} transparent opacity={0.9} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <sprite position={[0, -0.25, 0]} scale={radius * 9}>
-        <spriteMaterial map={glowTexture()} color={[2.6, 1.5, 0.5]} transparent opacity={0.8} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <PlumeLayer r0={radius * 0.55} r1={radius * 0.25} length={radius * 3.2} hot={HOT} cool={MID} power={1.3} />
+      <PlumeLayer r0={radius * 0.95} r1={radius * 1.6} length={radius * 9} hot={MID} cool={COOL} power={0.55} />
+      <sprite position={[0, -radius * 0.6, 0]} scale={radius * 7}>
+        <spriteMaterial map={glowTexture()} color={[2.6, 1.6, 0.6]} transparent opacity={0.85} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
+    </group>
+  )
+}
+
+/* ---------------- cloud layer ---------------- */
+
+/** Cloud puff positions, made once (seeded, so they are the same every launch) */
+const CLOUD_PUFFS = (() => {
+  let seed = 11
+  const rnd = () => {
+    seed = (seed * 16807) % 2147483647
+    return seed / 2147483647
+  }
+  return Array.from({ length: 90 }, (_, i) => {
+    // Denser near the middle, where the rocket passes
+    const r = i < 30 ? rnd() * 5 : 4 + rnd() * 34
+    const a = rnd() * Math.PI * 2
+    return {
+      x: Math.cos(a) * r,
+      z: Math.sin(a) * r - 2,
+      y: (rnd() - 0.5) * 1.4,
+      size: i < 30 ? 3.2 + rnd() * 2.5 : 5 + rnd() * 7,
+      shade: 0.86 + rnd() * 0.14,
+    }
+  })
+})()
+
+/**
+ * A deck of soft clouds the rocket punches through. While the camera is inside
+ * it the view whites out, which hides the switch from the launch site to the
+ * view of Earth from space.
+ */
+function CloudDeck({ deckRef, altitude }: { deckRef: RefObject<Group | null>; altitude: number }) {
+  return (
+    <group ref={deckRef} position={[0, altitude, 0]}>
+      {CLOUD_PUFFS.map((p, i) => (
+        <sprite key={i} position={[p.x, p.y, p.z]} scale={p.size}>
+          <spriteMaterial map={smokeTexture()} color={[p.shade, p.shade, p.shade * 1.03]} transparent opacity={0.92} depthWrite={false} />
+        </sprite>
+      ))}
     </group>
   )
 }
@@ -294,6 +425,9 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
   const fog = useRef<Fog>(null)
   const ground = useRef<Group>(null)
   const earth = useRef<Group>(null)
+  const deck = useRef<Group>(null)
+  /** Where the camera looks, lagging behind the rocket like a tracking camera */
+  const camFocusY = useRef<number | null>(null)
   const burning = useRef(false)
   const controls = useRef<OrbitControlsImpl>(null)
   /** True while the player is holding and dragging the view */
@@ -316,6 +450,7 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
 
 
   const breakupY = climbY(BREAKUP_AT) + look.height * 0.6
+  const cloudAlt = climbY(2.5) + top * 0.38 + 1.2
   const impact = underpoweredPath(IMPACT_AT)
 
   useFrame(({ clock: c }, delta) => {
@@ -357,14 +492,28 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
     r.rotation.y = flying && !destroyed ? smooth(t / 6) * 0.7 : 0
     r.visible = !broken
 
-    // ---- sky and ground ----
-    const space = destroyed ? 0 : smooth((t - 1.4) / 3.2)
+    // ---- sky, ground and clouds ----
+    // Below the clouds: the launch site and a deepening blue sky. Inside them the
+    // view whites out; above them it's the black of space with Earth below.
+    const camY = camera.position.y
+    const aboveClouds = !destroyed && camY > cloudAlt + 0.9
+    const pastClouds = aboveClouds ? smooth((camY - cloudAlt - 0.9) / 6) : 0
+    const space = destroyed ? 0 : Math.max(smooth((t - 0.8) / 4) * 0.35, pastClouds)
     if (sky.current) sky.current.uniforms.uSpace.value = space
-    if (ground.current) ground.current.visible = space < 0.98
-    // Morning haze near the ground; it clears as the rocket leaves the air
+    if (ground.current) ground.current.visible = !aboveClouds
+    if (deck.current) {
+      // The deck fades away once it is far below
+      // Clouds only appear as the camera flies up into them, and fade once far below
+      const fadeIn = smooth((camY - (cloudAlt - 3.5)) / 2.5)
+      const fadeOut = 1 - smooth((camY - cloudAlt - 2) / 7)
+      const fade = flying ? fadeIn * fadeOut : 0
+      deck.current.visible = !destroyed && fade > 0.01
+      deck.current.children.forEach((o) => (((o as Sprite).material as SpriteMaterial).opacity = 0.92 * fade))
+    }
+    // Morning haze near the ground; gone above the clouds
     if (fog.current) {
-      fog.current.near = 28 + space * 4000
-      fog.current.far = 95 + space * 20000
+      fog.current.near = aboveClouds ? 5000 : 28
+      fog.current.far = aboveClouds ? 20000 : 95
     }
 
     // ---- main engines ----
@@ -374,8 +523,9 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
     burning.current = flying && t < burnUntil && !broken && sputter
     if (flame.current) {
       flame.current.visible = burning.current
-      const boost = k0 === 'underpowered' ? 0.7 : 1 + Math.min(t, 3) * 0.25
-      flame.current.scale.set(flicker, flicker * boost, flicker)
+      // In thinner air the plume gets longer and spreads wider
+      const thin = k0 === 'underpowered' ? 0 : smooth(t / 3.4)
+      flame.current.scale.set(flicker * (1 + thin * 0.9), flicker * (k0 === 'underpowered' ? 0.75 : 1 + thin * 0.8), flicker * (1 + thin * 0.9))
     }
     if (engineLight.current) engineLight.current.intensity = burning.current ? 25 * flicker : 0
 
@@ -420,7 +570,7 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
         // Wrong orbit: the upper stage burns only briefly (not enough to climb higher)
         const upperEnd = k0 === 'wrong-orbit' ? SEPARATION_AT + 0.6 : FAIRING_AT
         upperFlame.current.visible = flying && t > SEPARATION_AT + 0.3 && t < upperEnd
-        upperFlame.current.scale.setScalar(flicker * 0.55)
+        upperFlame.current.scale.set(flicker * 1.6, flicker * 1.3, flicker * 1.6)
       }
       // Fairing opens, the spacecraft drifts out and turns
       const open = flying ? smooth((t - FAIRING_AT) / 1.2) : 0
@@ -446,7 +596,7 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
 
     // ---- Earth below once in space (much closer in the wrong, too-low orbit) ----
     if (earth.current) {
-      earth.current.visible = space > 0.3
+      earth.current.visible = aboveClouds
       const trouble = k0 === 'wrong-orbit' ? clamp01((t - TROUBLE_AT + 2) / 3) : 0
       earth.current.position.set(0, y - 30 + trouble * 9, -6)
     }
@@ -465,7 +615,11 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
     // Rumble: smooth waves (not random jumps), strongest at liftoff and for rough rides
     const rumble = burning.current && t < 3 ? (3 - t) * (0.012 + roughness * 0.035) : 0
     const shake = rumble + (broken && k < 0.6 ? (0.6 - k) * 0.25 : 0)
-    focus.set(x * 0.6 + Math.sin(now * 37) * shake, focusY + Math.sin(now * 29 + 1.3) * shake, 0)
+    // Like a launch broadcast: the rocket first rises away in the frame, then the
+    // camera catches up (frame-rate independent)
+    if (camFocusY.current === null || !flying) camFocusY.current = focusY
+    else camFocusY.current = MathUtils.damp(camFocusY.current, focusY, 2 + t * 0.9, delta)
+    focus.set(x * 0.6 + Math.sin(now * 37) * shake, camFocusY.current + Math.sin(now * 29 + 1.3) * shake, 0)
     const ctl = controls.current
     if (!placed.current) {
       camera.position.set(dist * 0.5, focusY + 0.5, dist * 0.87)
@@ -482,6 +636,8 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
     } else {
       camera.lookAt(focus)
     }
+
+    if (!flying) camFocusY.current = null
 
     if (flying && !finished.current && t > DURATION[k0]) {
       finished.current = true
@@ -530,8 +686,13 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
         }}
       />
 
+      <CloudDeck deckRef={deck} altitude={cloudAlt} />
+
       <group ref={earth} visible={false}>
-        <Earth radius={28} position={[0, 0, 0]} spin={0.01} />
+        {/* Tilted so the top of the globe (below the rocket) shows oceans and land, not the polar ice */}
+        <group rotation={[1.25, 0, 0]}>
+          <Earth radius={28} position={[0, 0, 0]} spin={0.01} />
+        </group>
       </group>
 
       <group ref={shadowRoot}>
