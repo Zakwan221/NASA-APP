@@ -33,8 +33,8 @@ import { glowTexture, smokeTexture } from '../../../../components/space/textures
 import { useOnScreen } from '../../../../components/space/useOnScreen'
 import { useShadows } from '../../../../components/space/useShadows'
 import Glow from '../../../../components/space/Glow'
-import { Booster, EngineCluster, FairingHalf, GridFins, LaunchSite, StageBody, VacuumEngine } from './Rocket'
-import { ROCKET_LOOK, rocketTop, type RocketLook } from './rocketLook'
+import { Booster, EngineCluster, FairingHalf, GridFins, LaunchSite, StageBody, VacuumEngine } from '../../../../components/space/Rocket'
+import { ROCKET_LOOK, rocketTop, type RocketLook } from '../../../../components/space/rocketLook'
 
 
 /** How long each result plays before onDone (seconds) */

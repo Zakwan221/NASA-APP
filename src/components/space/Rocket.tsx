@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react'
 import { DoubleSide, LatheGeometry, Vector2 } from 'three'
-import { concreteTexture, groundTexture } from '../../../../components/space/textures'
+import { concreteTexture, groundTexture } from './textures'
 import { NOSE_LENGTH, type RocketLook } from './rocketLook'
 
 /** Round parts use this many sides, so silhouettes look smooth */
@@ -310,6 +310,34 @@ export function LaunchSite({ rocketHeight }: { rocketHeight: number }) {
           <sphereGeometry args={[0.6, 24, 16]} />
           {white}
         </mesh>
+      </group>
+    </group>
+  )
+}
+
+/** A whole rocket standing still (for pictures and the guide). Base at y = 0. */
+export function RocketModel({ look }: { look: RocketLook }) {
+  const lowerH = look.height * 0.7
+  const upperH = look.height * 0.3
+  return (
+    <group>
+      <group position={[0, 0.3, 0]}>
+        <StageBody look={look} height={lowerH - 0.3} band />
+        <GridFins look={look} y={lowerH - 0.6} />
+        <EngineCluster radius={look.radius} big={look.radius > 0.25} />
+      </group>
+      {look.boosters &&
+        [-1, 1].map((side) => (
+          <group key={side} position={[side * look.radius * 1.6, 0.3, 0]}>
+            <Booster look={look} height={lowerH * 0.7} />
+          </group>
+        ))}
+      <group position={[0, lowerH, 0]}>
+        <StageBody look={look} height={upperH * 0.5} />
+        <group position={[0, upperH * 0.5, 0]}>
+          <FairingHalf look={look} side={-1} tube={upperH} />
+          <FairingHalf look={look} side={1} tube={upperH} />
+        </group>
       </group>
     </group>
   )

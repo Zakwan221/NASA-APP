@@ -6,7 +6,7 @@
 
 import { Edges, RoundedBox } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react'
 import { DoubleSide, LatheGeometry, Vector2, type Group, type Texture } from 'three'
 import type { MissionDesign } from '../../game/types'
 import { foilTexture, solarTexture } from './textures'
@@ -32,8 +32,12 @@ const COLORS = {
   led: '#22d3ee',
 }
 
+/** True when parts should appear at full size straight away (pictures, the guide) */
+const InstantContext = createContext(false)
+
 /** Scales its children from 0 to 1 when mounted (re-mounts when `key` changes) */
 function PopIn({ children, position }: { children: ReactNode; position?: [number, number, number] }) {
+  const instant = useContext(InstantContext)
   const ref = useRef<Group>(null)
   useFrame((_, delta) => {
     const g = ref.current
@@ -42,7 +46,7 @@ function PopIn({ children, position }: { children: ReactNode; position?: [number
     g.scale.setScalar(s)
   })
   return (
-    <group ref={ref} position={position} scale={0.001}>
+    <group ref={ref} position={position} scale={instant ? 1 : 0.001}>
       {children}
     </group>
   )
@@ -165,8 +169,22 @@ function Wing({ side, length, height, y }: { side: 1 | -1; length: number; heigh
   )
 }
 
-export default function CraftModel({ design }: { design: MissionDesign }) {
+/** The parts of the spacecraft, for drawing just one of them */
+export type CraftPart = 'frame' | 'solar' | 'battery' | 'computer' | 'attitude' | 'radio' | 'instruments'
+
+export default function CraftModel({
+  design,
+  only,
+  instant = false,
+}: {
+  design: MissionDesign
+  /** Draw just this part, placed where it sits on the spacecraft */
+  only?: CraftPart
+  /** Show parts at full size straight away instead of popping in */
+  instant?: boolean
+}) {
   const root = useRef<Group>(null)
+  const show = (part: CraftPart) => !only || only === part
   useShadows(root)
   const e = design.engineer
   const hasFrame = Boolean(e.structureId)
@@ -178,9 +196,10 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
   const instruments = design.science.instrumentIds
 
   return (
+    <InstantContext.Provider value={instant}>
     <group ref={root}>
       {/* Frame (a ghost outline until one is picked) */}
-      {hasFrame ? (
+      {show('frame') && hasFrame && (
         <PopIn key={e.structureId}>
           <RoundedBox args={[sx, sy, sz]} radius={0.025} smoothness={3}>
             <meshStandardMaterial color="#ffe3a3" map={foilTexture()} metalness={0.9} roughness={0.3} />
@@ -199,7 +218,8 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
           <Box size={[sx + 0.02, 0.025, sz + 0.02]} position={[0, sy / 2 + 0.008, 0]} color="#9ca3af" metal={0.85} rough={0.35} />
           <Box size={[sx + 0.02, 0.025, sz + 0.02]} position={[0, -sy / 2 - 0.008, 0]} color="#9ca3af" metal={0.85} rough={0.35} />
         </PopIn>
-      ) : (
+      )}
+      {!only && !hasFrame && (
         <mesh>
           <boxGeometry args={[sx, sy, sz]} />
           <meshBasicMaterial color={COLORS.led} wireframe transparent opacity={0.35} />
@@ -207,14 +227,14 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       )}
 
       {/* Solar */}
-      {e.solarId === 'solar-body' && (
+      {show('solar') && e.solarId === 'solar-body' && (
         <PopIn key="solar-body">
           <Box size={[sx * 0.9, sy * 0.85, 0.01]} position={[0, 0, front + 0.006]} color="#ffffff" map={solarTexture()} metal={0.55} rough={0.22} />
           <Box size={[0.01, sy * 0.85, sz * 0.9]} position={[sx / 2 + 0.006, 0, 0]} color="#ffffff" map={solarTexture()} metal={0.55} rough={0.22} />
           <Box size={[0.01, sy * 0.85, sz * 0.9]} position={[-sx / 2 - 0.006, 0, 0]} color="#ffffff" map={solarTexture()} metal={0.55} rough={0.22} />
         </PopIn>
       )}
-      {(e.solarId === 'solar-deploy' || e.solarId === 'solar-large') && (
+      {show('solar') && (e.solarId === 'solar-deploy' || e.solarId === 'solar-large') && (
         <PopIn key={e.solarId}>
           {([1, -1] as const).map((side) => (
             <group key={side} position={[side * (sx / 2), 0, 0]}>
@@ -232,7 +252,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       )}
 
       {/* Battery: a glowing pack on the back, bigger for more Wh */}
-      {e.batteryId && (
+      {show('battery') && e.batteryId && (
         <PopIn key={e.batteryId}>
           <Box
             size={[sx * 0.6, { 'battery-20': 0.12, 'battery-80': 0.22, 'battery-200': 0.36 }[e.batteryId] ?? 0.2, 0.08]}
@@ -246,7 +266,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       )}
 
       {/* Flight computer: a box on top with a blinking-looking LED */}
-      {e.computerId && (
+      {show('computer') && e.computerId && (
         <PopIn key={e.computerId}>
           <Box
             size={e.computerId === 'obc-big' ? [0.34, 0.1, 0.3] : [0.24, 0.06, 0.22]}
@@ -259,13 +279,13 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       )}
 
       {/* Attitude control */}
-      {e.attitudeId === 'magnetorquers' && (
+      {show('attitude') && e.attitudeId === 'magnetorquers' && (
         <PopIn key="mtq">
           <Rod from={[-sx / 2 + 0.05, top - 0.15, front + 0.03]} length={sx - 0.1} axis="x" color={COLORS.copper} radius={0.025} />
           <Rod from={[sx / 2 + 0.03, -sy / 4, front - 0.05]} length={-(sz - 0.1)} axis="z" color={COLORS.copper} radius={0.025} />
         </PopIn>
       )}
-      {(e.attitudeId === 'wheels' || e.attitudeId === 'star-tracker') && (
+      {show('attitude') && (e.attitudeId === 'wheels' || e.attitudeId === 'star-tracker') && (
         <PopIn key={e.attitudeId}>
           {[-0.18, 0, 0.18].map((x, i) => (
             <mesh key={i} position={[x * (sx / 0.8), -sy * 0.15, front + 0.04]} rotation={[Math.PI / 2, 0, 0]}>
@@ -285,7 +305,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
       )}
 
       {/* Radio */}
-      {design.comms.radioId === 'uhf' && (
+      {show('radio') && design.comms.radioId === 'uhf' && (
         <PopIn key="uhf">
           {([[-1, -1], [1, -1], [-1, 1], [1, 1]] as const).map(([dx, dz], i) => (
             <group key={i} position={[(dx * sx) / 2, top, (dz * sz) / 2]} rotation={[dz * 0.5, 0, -dx * 0.5]}>
@@ -294,24 +314,25 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
           ))}
         </PopIn>
       )}
-      {design.comms.radioId === 'sband' && (
+      {show('radio') && design.comms.radioId === 'sband' && (
         <PopIn key="sband">
           <Box size={[0.22, 0.02, 0.22]} position={[-sx * 0.2, top + 0.01, 0]} color={COLORS.white} edges={COLORS.rail} />
         </PopIn>
       )}
-      {design.comms.radioId === 'xband' && (
+      {show('radio') && design.comms.radioId === 'xband' && (
         <PopIn key="xband">
           <Dish radius={0.28} position={[-sx * 0.2, top, 0]} />
         </PopIn>
       )}
-      {design.comms.radioId === 'deep-transponder' && (
+      {show('radio') && design.comms.radioId === 'deep-transponder' && (
         <PopIn key="deep">
           <Dish radius={0.7} position={[0, top, 0]} />
         </PopIn>
       )}
 
       {/* Instruments on the bottom face, looking down at the target */}
-      {instruments.map((id, i) => {
+      {show('instruments') &&
+        instruments.map((id, i) => {
         const cols = Math.max(1, Math.min(3, instruments.length))
         const x = (i % cols - (cols - 1) / 2) * Math.min(0.3, sx / cols)
         const z = (Math.floor(i / cols) - 0.5 * Math.floor((instruments.length - 1) / cols)) * 0.3
@@ -322,6 +343,7 @@ export default function CraftModel({ design }: { design: MissionDesign }) {
         )
       })}
     </group>
+    </InstantContext.Provider>
   )
 }
 
