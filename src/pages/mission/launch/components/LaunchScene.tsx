@@ -30,6 +30,7 @@ import { Earth, Reflections, Sun } from '../../design/components/SpaceBackdrop'
 import { concreteTexture, glowTexture, groundTexture, smokeTexture } from '../../design/components/textures'
 import { useOnScreen } from '../../design/components/useOnScreen'
 import { useShadows } from '../../design/components/useShadows'
+import Glow from '../../design/components/Glow'
 
 
 interface RocketLook {
@@ -201,7 +202,8 @@ function Plume({
       s.scale.setScalar(p.size * (fire ? 1 - p.age * 0.5 : 1 + p.age * 3.5))
       const m = s.material as SpriteMaterial
       m.opacity = fire ? (1 - p.age) * 0.9 : (1 - p.age) * 0.55
-      if (fire) m.color.setRGB(1, 0.75 - p.age * 0.45, 0.35 - p.age * 0.3)
+      // Hot (brighter than white, so it glows) and cooling as it ages
+      if (fire) m.color.setRGB(2.6 - p.age * 1.4, (0.75 - p.age * 0.45) * 2.2, Math.max(0, 0.35 - p.age * 0.3) * 1.6)
       else {
         const g = 0.92 - p.age * 0.35
         m.color.setRGB(g, g, g)
@@ -225,6 +227,7 @@ function Plume({
             depthWrite={false}
             blending={fire ? AdditiveBlending : NormalBlending}
             color={fire ? '#ffb347' : '#e5e7eb'}
+            toneMapped={!fire}
           />
         </sprite>
       ))}
@@ -269,7 +272,7 @@ function Tower({ height }: { height: number }) {
       {/* Warning light on top */}
       <mesh position={[0, height + 0.08, 0]}>
         <sphereGeometry args={[0.06, 8, 6]} />
-        <meshBasicMaterial color="#f87171" />
+        <meshBasicMaterial color={[3, 0.5, 0.5]} toneMapped={false} />
       </mesh>
     </group>
   )
@@ -282,7 +285,7 @@ function Stage({ look, height, band }: { look: RocketLook; height: number; band?
     <group>
       <mesh position={[0, height / 2, 0]}>
         <cylinderGeometry args={[look.radius, look.radius, height, 24]} />
-        <meshStandardMaterial color={look.body} metalness={0.25} roughness={0.35} />
+        <meshStandardMaterial color={look.body} metalness={0.15} roughness={0.55} />
       </mesh>
       {/* Coloured stripe */}
       <mesh position={[0, height * 0.55, 0]}>
@@ -339,14 +342,14 @@ function Flame({ radius, flameRef }: { radius: number; flameRef: RefObject<Group
     <group ref={flameRef} position={[0, -0.24, 0]} visible={false}>
       <mesh position={[0, -0.45, 0]} rotation={[Math.PI, 0, 0]}>
         <coneGeometry args={[radius * 1.1, 1.0, 16, 1, true]} />
-        <meshBasicMaterial color="#ff7a1a" transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={[3, 1.1, 0.25]} transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh position={[0, -0.3, 0]} rotation={[Math.PI, 0, 0]}>
         <coneGeometry args={[radius * 0.6, 0.65, 16, 1, true]} />
-        <meshBasicMaterial color="#ffe08a" transparent opacity={0.9} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={[4, 3.4, 1.8]} transparent opacity={0.9} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
       <sprite position={[0, -0.25, 0]} scale={radius * 9}>
-        <spriteMaterial map={glowTexture()} color="#ffb04a" transparent opacity={0.8} blending={AdditiveBlending} depthWrite={false} />
+        <spriteMaterial map={glowTexture()} color={[2.6, 1.5, 0.5]} transparent opacity={0.8} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </sprite>
     </group>
   )
@@ -359,7 +362,7 @@ function Explosion({ boomRef, look }: { boomRef: RefObject<Group | null>; look: 
     <group ref={boomRef} visible={false}>
       {Array.from({ length: 10 }, (_, i) => (
         <sprite key={`f${i}`} userData={{ kind: 'fire', i }}>
-          <spriteMaterial map={glowTexture()} color="#ff9a2e" transparent blending={AdditiveBlending} depthWrite={false} />
+          <spriteMaterial map={glowTexture()} color={[3.2, 1.6, 0.4]} transparent blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
         </sprite>
       ))}
       {Array.from({ length: 12 }, (_, i) => (
@@ -586,8 +589,10 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
   return (
     <>
       <color attach="background" args={['#02040c']} />
-      <Reflections />
+      {/* Studio reflections are for space; outdoors keep them soft so white paint isn't blown out */}
+      <Reflections intensity={0.3} />
       <Sky matRef={sky} />
+      <Glow strength={1.1} />
       <Stars radius={100} depth={30} count={1500} factor={4} saturation={0.3} fade speed={0.3} />
       <Sun position={[30, 25, -40]} size={10} />
       <hemisphereLight args={['#bae6fd', '#3f6212', 0.6]} />
@@ -688,7 +693,7 @@ function Scene({ rocketId, design, kind, roughness, flying, onDone }: SceneProps
           <group ref={craft} position={[0, upperH * 0.55, 0]}>
             <CraftModel design={design} />
             <sprite ref={beacon} position={[0, 1, 0]} scale={1.4} visible={false}>
-              <spriteMaterial map={glowTexture()} color="#ff3b3b" transparent blending={AdditiveBlending} depthWrite={false} />
+              <spriteMaterial map={glowTexture()} color={[4, 0.4, 0.4]} transparent blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
             </sprite>
           </group>
 

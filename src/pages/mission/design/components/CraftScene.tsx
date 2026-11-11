@@ -4,6 +4,7 @@ import { useRef } from 'react'
 import ErrorBoundary from '../../../../components/ui/ErrorBoundary'
 import type { MissionDesign } from '../../../../game/types'
 import CraftModel from './CraftModel'
+import Glow from './Glow'
 import SpaceBackdrop from './SpaceBackdrop'
 import { useOnScreen } from './useOnScreen'
 
@@ -51,6 +52,7 @@ export default function CraftScene({
           gl={{ antialias: true, powerPreference: 'low-power' }}
         >
           <SpaceBackdrop />
+          <Glow strength={0.7} />
           <CameraDistance distance={Math.hypot(2.4, 1.2, 3) * d} />
           <Float speed={1.2} rotationIntensity={0.25} floatIntensity={0.4}>
             <group rotation={[0.2, 0, 0]}>
