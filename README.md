@@ -34,10 +34,14 @@ src/
     ├── home/                # Module 1 – Home page  ("/")
     │   ├── HomePage.tsx
     │   └── components/      # SolarStory (scroll 3D: Earth → spacecraft → solar system), AsteroidStat, ApodSection, HowItWorks
-    ├── info/                # Module 2 – How to play, a scroll-driven 3D guide ("/info")
-    │   ├── InfoPage.tsx
-    │   ├── guideContent.ts  # all the guide text (easy to edit)
-    │   └── components/      # GuideStory (screens), GuideScene (3D)
+    ├── info/                # Module 2 – 3 sub-pages, tabs at the top (InfoNav)
+    │   ├── InfoPage.tsx     # routes: /info, /info/items, /info/tips
+    │   ├── guideContent.ts  # How to play text (easy to edit)
+    │   ├── catalog.ts       # Items page: every item + its numbers for the compare bars
+    │   ├── itemNotes.ts     # Items page: "Best when" / "Watch out" for each item
+    │   ├── items/           # /info/items – every item explained, tap for a 3D close-up
+    │   ├── tips/            # /info/tips – score tips + a tested winning build per mission (tipsContent.ts)
+    │   └── components/      # GuideStory + GuideScene (How to play), InfoNav, Viewer3D
     └── games/               # Module 3 – multiplayer quiz ("/games")
         ├── GamesPage.tsx
         ├── api/quizApi.ts   # typed calls to the quiz functions + realtime
@@ -52,7 +56,7 @@ Each person owns one folder and only edits inside it:
 | Module | Folder | Route |
 |---|---|---|
 | 1 – Home | `src/pages/home/` | `/` |
-| 2 – Info | `src/pages/info/` | `/info` |
+| 2 – Info | `src/pages/info/` | `/info`, `/info/items`, `/info/tips` |
 | 3 – Games | `src/pages/games/` | `/games` |
 
 - Page-only components, images and data go in your page folder (`components/`, `assets/`). Import images, don't put them in `public/`.

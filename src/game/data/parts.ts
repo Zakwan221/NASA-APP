@@ -224,9 +224,9 @@ export const PARTS: Part[] = [
     massKg: 1.2,
     costM: 2,
     powerDrawW: 35,
-    dataRateKbps: 64,
+    dataRateKbps: 256, // JPL Iris supports up to 256 kbps
     maxRangeKm: 1_000_000_000,
-    explain: 'Talks to NASA’s Deep Space Network dishes from millions of km away, but only slowly.',
+    explain: 'Talks to NASA’s Deep Space Network dishes from millions of km away. Slower than radios near Earth.',
     source: `${SOA}, ch. 9 Communications (e.g. JPL Iris)`,
   },
 

@@ -24,6 +24,8 @@ interface MissionStore {
   setRocket: (id: string) => void
   setLaunch: (result: LaunchResult | null) => void
   /** Start over with an empty design */
+  /** Replace the whole design (e.g. a recommended build from the Tips page) */
+  loadDesign: (design: MissionDesign) => void
   reset: () => void
 }
 
@@ -59,6 +61,7 @@ export const useMission = create<MissionStore>()(
       setOrbit: (orbitId) => set((s) => edit({ ...s.design, comms: { ...s.design.comms, orbitId } })),
       setRocket: (launchVehicleId) => set((s) => edit({ ...s.design, comms: { ...s.design.comms, launchVehicleId } })),
       setLaunch: (launch) => set({ launch }),
+      loadDesign: (design) => set(edit(design)),
       reset: () => set({ design: EMPTY_DESIGN, launch: null }),
     }),
     {
