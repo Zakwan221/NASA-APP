@@ -12,16 +12,13 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Box3, PMREMGenerator, Vector3, type Group } from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
-import { INSTRUMENTS, partById, PARTS, ROCKETS } from '../../game/data'
-import { EMPTY_DESIGN, type MissionDesign, type PartCategory } from '../../game/types'
-import CraftModel, { type CraftPart } from './CraftModel'
-import { RocketModel } from './Rocket'
-import { ROCKET_LOOK } from './rocketLook'
+import { INSTRUMENTS, PARTS, ROCKETS } from '../../game/data'
+import ItemModel, { type ItemKind } from './ItemModel'
 import { emitThumbnails, hasThumbnail, saveThumbnail } from './thumbnailStore'
 
 interface ThumbItem {
   key: string
-  kind: 'part' | 'instrument' | 'rocket'
+  kind: ItemKind
   id: string
 }
 
@@ -30,34 +27,6 @@ const ITEMS: ThumbItem[] = [
   ...INSTRUMENTS.map((i) => ({ key: `instrument:${i.id}`, kind: 'instrument' as const, id: i.id })),
   ...ROCKETS.map((r) => ({ key: `rocket:${r.id}`, kind: 'rocket' as const, id: r.id })),
 ]
-
-const SLOT: Record<PartCategory, { part: CraftPart; set: (d: MissionDesign, id: string) => MissionDesign }> = {
-  structure: { part: 'frame', set: (d, id) => ({ ...d, engineer: { ...d.engineer, structureId: id } }) },
-  power: { part: 'solar', set: (d, id) => ({ ...d, engineer: { ...d.engineer, solarId: id } }) },
-  battery: { part: 'battery', set: (d, id) => ({ ...d, engineer: { ...d.engineer, batteryId: id } }) },
-  computer: { part: 'computer', set: (d, id) => ({ ...d, engineer: { ...d.engineer, computerId: id } }) },
-  attitude: { part: 'attitude', set: (d, id) => ({ ...d, engineer: { ...d.engineer, attitudeId: id } }) },
-  comms: { part: 'radio', set: (d, id) => ({ ...d, comms: { ...d.comms, radioId: id } }) },
-}
-
-/** Parts are placed on a 12U frame (sizes depend on the frame), but only the part is drawn */
-const BASE: MissionDesign = { ...EMPTY_DESIGN, engineer: { ...EMPTY_DESIGN.engineer, structureId: 'frame-12u' } }
-
-function ItemModel({ item }: { item: ThumbItem }) {
-  if (item.kind === 'rocket') return <RocketModel look={ROCKET_LOOK[item.id] ?? ROCKET_LOOK['rideshare-leo']} />
-  if (item.kind === 'instrument') {
-    // Instruments look down at Earth; tip them up so the lens faces the picture
-    return (
-      <group rotation={[-Math.PI * 0.62, 0, 0]}>
-        <CraftModel design={{ ...BASE, science: { instrumentIds: [item.id] } }} only="instruments" instant />
-      </group>
-    )
-  }
-  const part = partById(item.id)
-  if (!part) return null
-  const slot = SLOT[part.category]
-  return <CraftModel design={slot.set(BASE, item.id)} only={slot.part} instant />
-}
 
 /** Draws each item that has no picture yet, one per animation frame */
 function Shooter() {
@@ -106,7 +75,7 @@ function Shooter() {
     <>
       <primitive attach="environment" object={env} />
       <group ref={group} rotation={[0, -0.35, 0]}>
-        <ItemModel key={ITEMS[index].key} item={ITEMS[index]} />
+        <ItemModel key={ITEMS[index].key} kind={ITEMS[index].kind} id={ITEMS[index].id} />
       </group>
     </>
   )
