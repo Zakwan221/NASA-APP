@@ -68,6 +68,7 @@ export function useMissionRoom(code: string): MissionRoom {
           onDesign: () => void reload(),
           onPhase: () => void reload(),
           onResult: () => void reload(),
+          onLaunch: () => void reload(),
           onVote: (v) => setVote(v.status === 'open' ? v : null),
           onOp: (op) =>
             setOps((cur) =>

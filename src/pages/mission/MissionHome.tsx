@@ -13,7 +13,7 @@ const OPTIONS = [
     to: '/mission/team/host',
     icon: Satellite,
     title: 'Host a team mission',
-    text: 'Open a room for up to 4 people. Each takes a role and you vote on big decisions.',
+    text: 'Up to 4 people build one spacecraft together, live. Each role designs its part, then you launch and fly it as a crew.',
   },
   {
     to: '/mission/team/join',

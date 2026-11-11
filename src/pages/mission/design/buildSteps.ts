@@ -1,5 +1,5 @@
 import { BatteryFull, Box, Cpu, Crosshair, Orbit, RadioTower, Rocket, Sun, Telescope, type LucideIcon } from 'lucide-react'
-import type { MissionDesign, PartCategory, ResourceKey } from '../../../game/types'
+import type { MissionDesign, PartCategory, ResourceKey, Role } from '../../../game/types'
 
 /** The builder's steps, in order: six parts, instruments, then where to fly and on what */
 
@@ -15,18 +15,20 @@ export interface BuildStep {
   category?: PartCategory
   /** Which warnings belong on this step */
   resources: (ResourceKey | 'compatibility')[]
+  /** Team play: the role that makes this choice */
+  section: Role
 }
 
 export const BUILD_STEPS: BuildStep[] = [
-  { id: 'frame', title: 'Frame', icon: Box, hint: 'The body. Bigger frames carry more, but weigh more.', slot: 'structureId', category: 'structure', resources: ['mass'] },
-  { id: 'solar', title: 'Solar panels', icon: Sun, hint: 'Make power from sunlight.', slot: 'solarId', category: 'power', resources: ['power'] },
-  { id: 'battery', title: 'Battery', icon: BatteryFull, hint: 'Keeps things running when Earth blocks the Sun.', slot: 'batteryId', category: 'battery', resources: ['power'] },
-  { id: 'computer', title: 'Computer', icon: Cpu, hint: 'Runs the spacecraft and stores your data.', slot: 'computerId', category: 'computer', resources: ['data'] },
-  { id: 'attitude', title: 'Pointing', icon: Crosshair, hint: 'Aims the instruments at the target.', slot: 'attitudeId', category: 'attitude', resources: ['compatibility'] },
-  { id: 'radio', title: 'Radio', icon: RadioTower, hint: 'Sends your data home to Earth.', slot: 'radio', category: 'comms', resources: ['data', 'comms'] },
-  { id: 'instruments', title: 'Instruments', icon: Telescope, hint: 'What does the science. Pick one or more.', resources: ['compatibility', 'power', 'data'] },
-  { id: 'orbit', title: 'Orbit', icon: Orbit, hint: 'Where your spacecraft will fly.', resources: ['comms', 'lifetime', 'compatibility'] },
-  { id: 'rocket', title: 'Rocket', icon: Rocket, hint: 'What carries it there. It must be strong enough.', resources: ['mass', 'budget'] },
+  { id: 'frame', title: 'Frame', icon: Box, hint: 'The body. Bigger frames carry more, but weigh more.', slot: 'structureId', category: 'structure', resources: ['mass'], section: 'engineer' },
+  { id: 'solar', title: 'Solar panels', icon: Sun, hint: 'Make power from sunlight.', slot: 'solarId', category: 'power', resources: ['power'], section: 'engineer' },
+  { id: 'battery', title: 'Battery', icon: BatteryFull, hint: 'Keeps things running when Earth blocks the Sun.', slot: 'batteryId', category: 'battery', resources: ['power'], section: 'engineer' },
+  { id: 'computer', title: 'Computer', icon: Cpu, hint: 'Runs the spacecraft and stores your data.', slot: 'computerId', category: 'computer', resources: ['data'], section: 'engineer' },
+  { id: 'attitude', title: 'Pointing', icon: Crosshair, hint: 'Aims the instruments at the target.', slot: 'attitudeId', category: 'attitude', resources: ['compatibility'], section: 'engineer' },
+  { id: 'radio', title: 'Radio', icon: RadioTower, hint: 'Sends your data home to Earth.', slot: 'radio', category: 'comms', resources: ['data', 'comms'], section: 'comms' },
+  { id: 'instruments', title: 'Instruments', icon: Telescope, hint: 'What does the science. Pick one or more.', resources: ['compatibility', 'power', 'data'], section: 'science' },
+  { id: 'orbit', title: 'Orbit', icon: Orbit, hint: 'Where your spacecraft will fly.', resources: ['comms', 'lifetime', 'compatibility'], section: 'comms' },
+  { id: 'rocket', title: 'Rocket', icon: Rocket, hint: 'What carries it there. It must be strong enough.', resources: ['mass', 'budget'], section: 'comms' },
 ]
 
 /** Has the player made a choice on this step? */
