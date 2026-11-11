@@ -1,6 +1,6 @@
 /**
  * Shared NASA Open API helpers.
- * Used by Home, Info and Games pages — keep this file framework-free.
+ * Used by the Home and Info pages — keep this file framework-free.
  * Every function returns `null` on failure so pages never crash.
  */
 

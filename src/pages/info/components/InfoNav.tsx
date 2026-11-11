@@ -1,4 +1,6 @@
+import { motion } from 'framer-motion'
 import { BookOpen, Boxes, Trophy } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
 const TABS = [
@@ -7,28 +9,66 @@ const TABS = [
   { to: '/info/tips', end: false, label: 'Tips to win', icon: Trophy },
 ]
 
-/** The three Info pages, as tabs floating under the main menu */
+/**
+ * The three Info pages as a liquid-glass tab bar under the main menu.
+ * Once the page scrolls, a frosted band joins it to the menu, so nothing shows around it.
+ * Pages leave room for it at the top (pt-40), so it never covers content at rest.
+ */
 export default function InfoNav() {
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
-    <nav aria-label="Info pages" className="pointer-events-none fixed inset-x-0 top-[4.5rem] z-40 flex justify-center px-3">
-      <ul className="pointer-events-auto flex gap-1 rounded-full border border-white/10 bg-space-950/95 p-1 shadow-xl shadow-black/60 backdrop-blur-xl">
+    <nav aria-label="Info pages" className="pointer-events-none fixed inset-x-0 top-16 z-40 flex justify-center px-3 pb-2.5 pt-2">
+      {/* Frosted band (matches the menu bar above it) */}
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 border-b border-white/10 bg-space-950/85 backdrop-blur-md transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}
+      />
+      <motion.ul
+        initial={{ opacity: 0, y: -12, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+        className="lg-glass pointer-events-auto flex gap-1 rounded-full p-1"
+      >
+        <li className="lg-sweep" aria-hidden="true" />
         {TABS.map((t) => (
           <li key={t.to}>
             <NavLink
               to={t.to}
               end={t.end}
               className={({ isActive }) =>
-                `flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition sm:px-4 ${
-                  isActive ? 'bg-cyan-400 text-space-950' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                `relative flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors sm:px-4 ${
+                  isActive ? 'text-space-950' : 'text-slate-200 hover:text-white'
                 }`
               }
             >
-              <t.icon aria-hidden="true" className="size-4" />
-              {t.label}
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <motion.span
+                      layoutId="info-tab-drop"
+                      className="lg-drop absolute inset-0 rounded-full"
+                      transition={{
+                        type: 'spring',
+                        stiffness: 420,
+                        damping: 32,
+                      }}
+                    />
+                  )}
+                  <t.icon aria-hidden="true" className="relative size-4" />
+                  <span className="relative">{t.label}</span>
+                </>
+              )}
             </NavLink>
           </li>
         ))}
-      </ul>
+      </motion.ul>
     </nav>
   )
 }

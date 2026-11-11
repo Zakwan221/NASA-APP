@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { InfoBackdrop } from './components/Cinematic'
 import GuideStory from './components/GuideStory'
 import InfoNav from './components/InfoNav'
+import './info.css'
 import ItemsPage from './items/ItemsPage'
 import TipsPage from './tips/TipsPage'
 
@@ -13,6 +15,7 @@ import TipsPage from './tips/TipsPage'
 export default function InfoPage() {
   return (
     <>
+      <InfoBackdrop />
       <InfoNav />
       <Routes>
         <Route index element={<GuideStory />} />

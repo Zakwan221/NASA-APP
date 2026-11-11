@@ -1,0 +1,216 @@
+/*
+ * Module 2 (Info) look: "liquid glass" surfaces and a cinematic backdrop.
+ * Lives in @layer components so Tailwind classes (hover:, border-…) still win.
+ */
+@layer components {
+  /* Frosted glass with a bright top edge, a soft sheen and a glowing rim */
+  .lg-glass {
+    position: relative;
+    isolation: isolate;
+    background: linear-gradient(150deg, rgb(255 255 255 / 0.14) 0%, rgb(255 255 255 / 0.03) 42%, rgb(255 255 255 / 0.07) 100%), rgb(8 12 30 / 0.55);
+    -webkit-backdrop-filter: blur(24px) saturate(175%);
+    backdrop-filter: blur(24px) saturate(175%);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.35),
+      inset 0 -1px 0 rgb(255 255 255 / 0.05),
+      inset 0 0 24px rgb(255 255 255 / 0.03),
+      0 20px 50px -20px rgb(0 0 0 / 0.85);
+  }
+  .lg-glass::before,
+  .lg-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(120% 70% at 18% 0%, rgb(255 255 255 / 0.16), transparent 55%);
+  }
+  /* Rim light: bright at the top-left, cyan at the bottom-right */
+  .lg-glass::after,
+  .lg-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0) 32%, rgb(103 232 249 / 0) 62%, rgb(103 232 249 / 0.45));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* Lighter glass for many cards at once (no backdrop blur, so it stays smooth on phones).
+     A spotlight follows the pointer: set --mx / --my. */
+  .lg-card {
+    position: relative;
+    isolation: isolate;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background:
+      radial-gradient(420px circle at var(--mx, 50%) var(--my, -30%), rgb(103 232 249 / 0.13), transparent 45%),
+      linear-gradient(160deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.015) 50%, rgb(255 255 255 / 0.04)), rgb(10 16 36 / 0.72);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.2),
+      0 18px 40px -24px rgb(0 0 0 / 0.9);
+  }
+
+  /* The liquid "drop" behind the active tab */
+  .lg-drop {
+    background: linear-gradient(180deg, #cffafe 0%, #67e8f9 38%, #22d3ee 62%, #0e7490 100%);
+    box-shadow:
+      inset 0 1px 1px rgb(255 255 255 / 0.9),
+      inset 0 -3px 8px rgb(8 51 68 / 0.45),
+      0 0 26px -4px rgb(34 211 238 / 0.85);
+  }
+
+  /* Big gradient headline */
+  .lg-title {
+    background: linear-gradient(100deg, #fff 10%, #a5f3fc 45%, #c4b5fd 80%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* ---------- cinematic backdrop ---------- */
+
+.lg-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+  background: #04060f;
+}
+.lg-nebula {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.lg-nebula.a {
+  width: 55vmax;
+  height: 55vmax;
+  left: -15vmax;
+  top: -20vmax;
+  background: radial-gradient(circle, rgb(34 211 238 / 0.55), transparent 65%);
+  animation: lg-drift-a 38s ease-in-out infinite alternate;
+}
+.lg-nebula.b {
+  width: 60vmax;
+  height: 60vmax;
+  right: -25vmax;
+  top: 15vh;
+  background: radial-gradient(circle, rgb(139 92 246 / 0.5), transparent 65%);
+  animation: lg-drift-b 46s ease-in-out infinite alternate;
+}
+.lg-nebula.c {
+  width: 45vmax;
+  height: 45vmax;
+  left: 20vw;
+  bottom: -30vmax;
+  background: radial-gradient(circle, rgb(37 99 235 / 0.45), transparent 65%);
+  animation: lg-drift-a 52s ease-in-out infinite alternate-reverse;
+}
+.lg-stars {
+  position: absolute;
+  inset: -50%;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 140px 90px, rgb(255 255 255 / 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 260px 200px, #e0f2fe, transparent), radial-gradient(1px 1px at 330px 40px, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(1px 1px at 90px 260px, rgb(255 255 255 / 0.7), transparent);
+  background-size: 380px 300px;
+  opacity: 0.55;
+  animation: lg-stars 140s linear infinite;
+}
+.lg-stars.far {
+  background-size: 220px 180px;
+  opacity: 0.3;
+  animation-duration: 260s;
+}
+.lg-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, transparent 45%, rgb(0 0 0 / 0.75) 100%);
+}
+/* Film grain */
+.lg-grain {
+  position: absolute;
+  inset: -100%;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: lg-grain 0.9s steps(5) infinite;
+}
+
+@keyframes lg-drift-a {
+  to {
+    transform: translate3d(12vw, 10vh, 0) scale(1.15);
+  }
+}
+@keyframes lg-drift-b {
+  to {
+    transform: translate3d(-14vw, -8vh, 0) scale(0.9);
+  }
+}
+@keyframes lg-stars {
+  to {
+    transform: translate3d(-380px, -300px, 0);
+  }
+}
+@keyframes lg-grain {
+  0% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-6%, 4%);
+  }
+  40% {
+    transform: translate(5%, -7%);
+  }
+  60% {
+    transform: translate(-3%, 8%);
+  }
+  80% {
+    transform: translate(7%, 2%);
+  }
+}
+/* Shine that sweeps across a glass edge */
+@keyframes lg-sweep {
+  from {
+    transform: translateX(-120%) skewX(-20deg);
+  }
+  to {
+    transform: translateX(260%) skewX(-20deg);
+  }
+}
+.lg-sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.lg-sweep::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.18), transparent);
+  animation: lg-sweep 6s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-nebula,
+  .lg-stars,
+  .lg-grain,
+  .lg-sweep::before {
+    animation: none;
+  }
+}

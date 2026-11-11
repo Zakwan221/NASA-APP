@@ -41,12 +41,10 @@ src/
     │   ├── itemNotes.ts     # Items page: "Best when" / "Watch out" for each item
     │   ├── items/           # /info/items – every item explained, tap for a 3D close-up
     │   ├── tips/            # /info/tips – score tips + a tested winning build per mission (tipsContent.ts)
-    │   └── components/      # GuideStory + GuideScene (How to play), InfoNav, Viewer3D
-    └── games/               # Module 3 – multiplayer quiz ("/games")
-        ├── GamesPage.tsx
-        ├── api/quizApi.ts   # typed calls to the quiz functions + realtime
-        └── components/
-supabase/                    # quiz database: migration, seed, setup steps (see supabase/README.md)
+    │   ├── info.css         # liquid-glass + cinematic backdrop styles (Info pages only)
+    │   └── components/      # GuideStory + GuideScene (How to play), InfoNav, Viewer3D, Cinematic
+    └── mission/             # Module 3 – the mission game: design, launch, fly, report ("/mission")
+supabase/                    # database: migrations, seed, setup steps (see supabase/README.md). The old quiz tables are no longer used by the app.
 ```
 
 ## Team split (3 people)
@@ -57,7 +55,7 @@ Each person owns one folder and only edits inside it:
 |---|---|---|
 | 1 – Home | `src/pages/home/` | `/` |
 | 2 – Info | `src/pages/info/` | `/info`, `/info/items`, `/info/tips` |
-| 3 – Games | `src/pages/games/` | `/games` |
+| 3 – Mission | `src/pages/mission/` | `/mission` |
 
 - Page-only components, images and data go in your page folder (`components/`, `assets/`). Import images, don't put them in `public/`.
 - Shared files (`lib/`, `hooks/`, `components/`, `index.css`, `App.tsx`, `navLinks.ts`) affect everyone — tell the team before changing them.
