@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react'
 import { DoubleSide, LatheGeometry, Vector2 } from 'three'
-import { concreteTexture, groundTexture } from '../../design/components/textures'
+import { concreteTexture, groundTexture } from '../../../../components/space/textures'
 import { NOSE_LENGTH, type RocketLook } from './rocketLook'
 
 /** Round parts use this many sides, so silhouettes look smooth */

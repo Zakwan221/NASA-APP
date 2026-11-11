@@ -1,12 +1,12 @@
 import ApodSection from './components/ApodSection'
 import AsteroidStat from './components/AsteroidStat'
 import HowItWorks from './components/HowItWorks'
-import Hero from './components/Hero'
+import SolarStory from './components/SolarStory'
 
 export default function HomePage() {
   return (
     <>
-      <Hero />
+      <SolarStory />
       <AsteroidStat />
       <ApodSection />
       <HowItWorks />

@@ -8,7 +8,7 @@ import { Edges, RoundedBox } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef, type ReactNode } from 'react'
 import { DoubleSide, LatheGeometry, Vector2, type Group, type Texture } from 'three'
-import type { MissionDesign } from '../../../../game/types'
+import type { MissionDesign } from '../../game/types'
 import { foilTexture, solarTexture } from './textures'
 import { useShadows } from './useShadows'
 

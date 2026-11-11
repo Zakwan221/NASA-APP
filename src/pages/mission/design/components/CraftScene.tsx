@@ -3,10 +3,10 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import ErrorBoundary from '../../../../components/ui/ErrorBoundary'
 import type { MissionDesign } from '../../../../game/types'
-import CraftModel from './CraftModel'
-import Glow from './Glow'
-import SpaceBackdrop from './SpaceBackdrop'
-import { useOnScreen } from './useOnScreen'
+import CraftModel from '../../../../components/space/CraftModel'
+import Glow from '../../../../components/space/Glow'
+import SpaceBackdrop from '../../../../components/space/SpaceBackdrop'
+import { useOnScreen } from '../../../../components/space/useOnScreen'
 
 /** Glides the camera to the given distance (works together with OrbitControls) */
 function CameraDistance({ distance }: { distance: number }) {

@@ -21,13 +21,13 @@ import {
   type MeshStandardMaterial,
   type WebGLProgramParametersWithUniforms,
 } from 'three'
-import ErrorBoundary from '../../../../components/ui/ErrorBoundary'
-import CLOUDS from '../../assets/earth_clouds_1024.png'
-import DAY from '../../assets/earth_atmos_2048.jpg'
-import LIGHTS from '../../assets/earth_lights_2048.png'
-import NORMAL from '../../assets/earth_normal_2048.jpg'
-import SPECULAR from '../../assets/earth_specular_2048.jpg'
-import HDRI from '../../assets/studio_small_09_1k.hdr?url'
+import ErrorBoundary from '../ui/ErrorBoundary'
+import CLOUDS from '../../assets/space/earth_clouds_1024.png'
+import DAY from '../../assets/space/earth_atmos_2048.jpg'
+import LIGHTS from '../../assets/space/earth_lights_2048.png'
+import NORMAL from '../../assets/space/earth_normal_2048.jpg'
+import SPECULAR from '../../assets/space/earth_specular_2048.jpg'
+import HDRI from '../../assets/space/studio_small_09_1k.hdr?url'
 import { glowTexture } from './textures'
 
 /** Where sunlight comes from in every scene (world space) */
@@ -40,7 +40,8 @@ const SUN_DIRECTION = new Vector3(6, 4, 4).normalize()
  *  - oceans (white in the specular map) are smooth and reflect the Sun
  *  - city lights only glow on the side facing away from the Sun
  */
-function EarthSurface() {
+/** `sunDirection` (world space, towards the Sun) may be changed every frame by the parent */
+function EarthSurface({ sunDirection = SUN_DIRECTION }: { sunDirection?: Vector3 }) {
   const [day, normal, specular, lights] = useTexture([DAY, NORMAL, SPECULAR, LIGHTS], (loaded) => {
     loaded[0].colorSpace = SRGBColorSpace
     loaded[3].colorSpace = SRGBColorSpace
@@ -50,7 +51,7 @@ function EarthSurface() {
 
   useFrame(({ camera }) => {
     // The night mask works in view space, so turn the Sun direction with the camera
-    uniforms.uSunView.value.copy(SUN_DIRECTION).transformDirection(camera.matrixWorldInverse)
+    uniforms.uSunView.value.copy(sunDirection).transformDirection(camera.matrixWorldInverse)
   })
 
   const onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
@@ -109,7 +110,18 @@ const ATMOS_FRAG = /* glsl */ `
   }
 `
 
-export function Earth({ radius, position, spin = 0.02 }: { radius: number; position: [number, number, number]; spin?: number }) {
+export function Earth({
+  radius,
+  position,
+  spin = 0.02,
+  sunDirection,
+}: {
+  radius: number
+  position: [number, number, number]
+  spin?: number
+  /** Towards the Sun, for the night side; defaults to the scenes' usual sunlight */
+  sunDirection?: Vector3
+}) {
   const ref = useRef<Mesh>(null)
   const cloudRef = useRef<Mesh>(null)
   useFrame((_, delta) => {
@@ -124,7 +136,7 @@ export function Earth({ radius, position, spin = 0.02 }: { radius: number; posit
           <sphereGeometry args={[radius, 96, 64]} />
           <ErrorBoundary fallback={fallback}>
             <Suspense fallback={fallback}>
-              <EarthSurface />
+              <EarthSurface sunDirection={sunDirection} />
             </Suspense>
           </ErrorBoundary>
         </mesh>
