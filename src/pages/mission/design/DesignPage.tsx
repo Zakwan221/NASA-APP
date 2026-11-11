@@ -79,7 +79,11 @@ export default function DesignPage({
   const goStep = (n: number) => setParams({ build: String(n) }, { replace: true })
   const startBuilding = () => {
     // Continue where the player stopped: the first step that still needs a choice
-    const first = BUILD_STEPS.findIndex((s) => !stepDone(design, s))
+    // (in team play, the first one that is yours to pick)
+    const mine = (s: (typeof BUILD_STEPS)[number]) => !store.team || store.canEdit(s.section)
+    let first = BUILD_STEPS.findIndex((s) => mine(s) && !stepDone(design, s))
+    if (first < 0) first = BUILD_STEPS.findIndex(mine)
+    if (first < 0) first = BUILD_STEPS.findIndex((s) => !stepDone(design, s))
     setParams({ build: String(first < 0 ? BUILD_STEPS.length - 1 : first) })
   }
 

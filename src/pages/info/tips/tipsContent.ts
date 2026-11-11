@@ -65,10 +65,10 @@ export const SCORE_TIPS = [
     tip: 'Match the radio to your instruments’ data, and don’t spend the last dollar on parts.',
   },
   {
-    label: 'Decisions',
+    label: 'Handling surprises',
     points: 15,
-    how: 'Choices during flight that don’t end badly.',
-    tip: 'When an event pops up, read the risk. The safer choice is usually worth its small cost.',
+    how: 'Ride out solar storms, space junk and glitches without damage.',
+    tip: 'Mission control handles surprises for you. A sturdy design with spare power and money left survives them best.',
   },
 ]
 
