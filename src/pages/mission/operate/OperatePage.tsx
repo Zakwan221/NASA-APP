@@ -1,11 +1,9 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useMemo, useState, type ReactNode } from 'react'
-import { EVENTS, type MissionEvent } from '../../../game/events/events'
 import {
   activeInstruments,
-  chooseEventOption,
   downlinkPerMonthMbit,
-  runMonth,
+  flyMonth,
   startOperate,
   toggleInstrument,
   type FlightSpacecraft,
@@ -48,8 +46,7 @@ export default function OperatePage({
         craft={craft}
         state={state}
         onToggle={(id, on) => setState((s) => toggleInstrument(s, id, on))}
-        onChoose={(idx) => setState((s) => chooseEventOption(craft, s, idx))}
-        onFly={() => setState((s) => runMonth(craft, s))}
+        onFly={() => setState((s) => flyMonth(craft, s))}
       />
     </Shell>
   )
@@ -59,14 +56,11 @@ export interface OperateViewProps {
   craft: FlightSpacecraft
   state: OperateState
   onToggle: (instrumentId: string, on: boolean) => void
-  onChoose: (choiceIndex: number) => void
   onFly: () => void
   /** Team mode: false for players who don't control the instruments */
   canToggle?: boolean
   /** Shown under the instruments when switching is locked */
   toggleNote?: string
-  /** Team mode: replaces the plain choice buttons (e.g. with vote buttons) */
-  renderChoices?: (event: MissionEvent) => ReactNode
   /** Team mode: replaces the Fly button (e.g. "Waiting for the host") */
   flyControl?: ReactNode
   /** Extra panel under the header (e.g. your role and goal) */
@@ -78,11 +72,9 @@ export function OperateView({
   craft,
   state,
   onToggle,
-  onChoose,
   onFly,
   canToggle = true,
   toggleNote,
-  renderChoices,
   flyControl,
   banner,
 }: OperateViewProps) {
@@ -92,7 +84,6 @@ export function OperateView({
   const instrumentW = activeInstruments(craft, state).reduce((s, i) => s + i.powerDrawW, 0)
   const avgGenW = solarW * (1 - craft.orbit.shadowFraction) * (0.5 + state.health / 200)
   const downlink = useMemo(() => downlinkPerMonthMbit(craft), [craft])
-  const event = state.pending ? EVENTS[state.pending.id] : null
 
   return (
     <>
@@ -204,63 +195,18 @@ export function OperateView({
         {toggleNote && <p className="mt-3 text-sm text-slate-400">{toggleNote}</p>}
       </section>
 
-      {/* Event or next month */}
-      <AnimatePresence mode="wait">
-        {event && state.pending ? (
-          <motion.section
-            key={`${state.month}-${event.id}`}
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.25, ease: EASE_OUT }}
-            className="card mt-6 border-amber-300/40 p-5"
-            aria-live="polite"
+      {/* Next month (surprise events are handled by mission control, see flyMonth) */}
+      <div className="mt-6 text-center">
+        {flyControl ?? (
+          <button
+            type="button"
+            onClick={onFly}
+            className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
           >
-            <p className="text-sm font-semibold uppercase tracking-wider text-amber-300">Decision needed</p>
-            <h2 className="mt-1 text-2xl font-bold">
-              <span aria-hidden="true">{event.icon}</span> {event.title}
-            </h2>
-            <p className="mt-2 text-slate-200">{event.describe(craft, state.pending)}</p>
-            <p className="mt-1 text-xs text-slate-500">Real-world source: {event.source}</p>
-            {renderChoices ? (
-              renderChoices(event)
-            ) : (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {event.choices.map((c, idx) => (
-                  <button
-                    key={c.label}
-                    type="button"
-                    onClick={() => onChoose(idx)}
-                    className="rounded-xl border border-white/15 p-4 text-left transition hover:border-white/30 hover:bg-white/5 active:scale-[0.98]"
-                  >
-                    <span className="block font-semibold">{c.label}</span>
-                    <span className="text-sm text-slate-400">{c.hint}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </motion.section>
-        ) : (
-          <motion.div
-            key="next"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="mt-6 text-center"
-          >
-            {flyControl ?? (
-              <button
-                type="button"
-                onClick={onFly}
-                className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
-              >
-                Fly month {state.month + 1} →
-              </button>
-            )}
-          </motion.div>
+            Fly month {state.month + 1} →
+          </button>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* Last month */}
       {state.lastReport && (

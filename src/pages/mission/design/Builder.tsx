@@ -247,26 +247,45 @@ export default function Builder({
             <ol className="pointer-events-auto mt-3 flex gap-1" aria-label="Build steps">
               {BUILD_STEPS.map((s, i) => {
                 const done = stepDone(design, s)
+                // Team play: the steps this player chooses glow, so they can find them
+                const mine = store.team && store.canEdit(s.section)
                 return (
-                  <li key={s.id}>
+                  <li key={s.id} className="relative">
+                    {mine && i !== step && (
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -inset-1 animate-pulse rounded-full ring-2 ring-cyan-300 shadow-[0_0_14px_3px_rgba(103,232,249,0.65)]"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => onStep(i)}
                       aria-current={i === step ? 'step' : undefined}
-                      title={s.title}
-                      className={`flex size-8 items-center justify-center rounded-full transition ${
-                        i === step ? 'bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.7)]' : done ? 'bg-emerald-400/30' : 'bg-white/10 hover:bg-white/20'
+                      title={mine ? `${s.title} (your choice)` : s.title}
+                      className={`relative flex size-8 items-center justify-center rounded-full transition ${
+                        i === step
+                          ? 'bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.7)]'
+                          : done
+                            ? 'bg-emerald-400/30'
+                            : store.team && !mine
+                              ? 'bg-white/[0.06] opacity-60 hover:opacity-100'
+                              : 'bg-white/10 hover:bg-white/20'
                       }`}
                     >
                       <s.icon aria-hidden="true" className={`size-4 ${i === step ? 'text-space-950' : 'text-white'}`} />
                       <span className="sr-only">
-                        {s.title} {done ? '(done)' : ''}
+                        {s.title} {done ? '(done)' : ''} {mine ? '(your choice)' : ''}
                       </span>
                     </button>
                   </li>
                 )
               })}
             </ol>
+            {store.team && (
+              <p className="pointer-events-none mt-2 flex items-center gap-1.5 text-[11px] text-slate-300">
+                <span className="inline-block size-2.5 animate-pulse rounded-full ring-2 ring-cyan-300" /> Glowing steps are yours to pick
+              </p>
+            )}
           </div>
           <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-black/40 px-3 py-1 text-xs text-slate-200 backdrop-blur">
             <Rotate3d aria-hidden="true" className="size-3.5" /> Hold and drag to turn it

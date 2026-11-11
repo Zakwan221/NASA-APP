@@ -90,8 +90,18 @@ export interface MissionState {
   results: ResultPayload[]
   /** The launch roll for this attempt, or null before the Flight Director presses Launch */
   launch_seed: number | null
-  /** How many times this crew has pressed Launch (a new number = a new launch to play) */
+  /** How many times this crew has launched (a new number = a new launch to play) */
   launch_count: number
+  /** Who has tapped Launch on the pad (user ids). The rocket goes when everyone has. */
+  launch_ready: string[]
+}
+
+export interface ChatMessage {
+  id: number
+  user_id: string
+  nickname: string
+  text: string
+  created_at: string
 }
 
 export interface LaunchPayload {
@@ -167,7 +177,11 @@ export const submitMissionResult = (roomId: string, teamName: string, score: Sco
 
 /* ---------------- launch day (20261112000000_team_launch.sql) ---------------- */
 
-/** Host, on the launch pad: roll launch day. Every phone gets the seed and plays the same launch. */
+/** Anyone on the pad: tap Launch (or take it back). When the whole crew is ready, the rocket goes. */
+export const readyToLaunch = (roomId: string, ready = true) =>
+  rpc<{ ready: string[] } | LaunchPayload>('ready_to_launch', { p_room_id: roomId, p_ready: ready })
+
+/** Host, on the launch pad: launch now without waiting for everyone */
 export const launchMission = (roomId: string) => rpc<LaunchPayload>('launch_mission', { p_room_id: roomId })
 
 /** Host, on the launch pad: go back to Design (e.g. after a failed launch) */
@@ -181,6 +195,12 @@ export const addMissionOp = (roomId: string, kind: MissionOpKind, payload: Missi
   rpc<MissionOp>('add_mission_op', { p_room_id: roomId, p_kind: kind, p_payload: payload })
 
 export const getMissionOps = (roomId: string) => rpc<MissionOps>('get_mission_ops', { p_room_id: roomId })
+
+/* ---------------- crew chat (20261112010000_team_ready_chat.sql) ---------------- */
+
+export const sendChat = (roomId: string, text: string) => rpc<ChatMessage>('send_chat', { p_room_id: roomId, p_text: text })
+/** The last 50 messages, oldest first */
+export const getChat = (roomId: string) => rpc<ChatMessage[]>('get_chat', { p_room_id: roomId })
 
 export const getMissionState = (code: string) => rpc<MissionState>('get_mission_state', { p_code: code })
 
@@ -226,6 +246,8 @@ export interface MissionHandlers {
   onResult?: (r: ResultPayload) => void
   onOp?: (op: MissionOp) => void
   onLaunch?: (l: LaunchPayload) => void
+  onLaunchReady?: (ready: string[]) => void
+  onChat?: (m: ChatMessage) => void
   /** Who has the screen open right now (presence), by user id */
   onOnline?: (userIds: string[]) => void
   /** Called on every (re)connect: reload with getMissionState() here */
@@ -247,6 +269,8 @@ export function connectToMission(code: string, userId: string, handlers: Mission
     .on('broadcast', { event: 'vote' }, ({ payload }) => handlers.onVote?.(payload as VotePayload))
     .on('broadcast', { event: 'result' }, ({ payload }) => handlers.onResult?.(payload as ResultPayload))
     .on('broadcast', { event: 'launch' }, ({ payload }) => handlers.onLaunch?.(payload as LaunchPayload))
+    .on('broadcast', { event: 'launch_ready' }, ({ payload }) => handlers.onLaunchReady?.((payload as { ready: string[] }).ready))
+    .on('broadcast', { event: 'chat' }, ({ payload }) => handlers.onChat?.(payload as ChatMessage))
     .on('broadcast', { event: 'op' }, ({ payload }) => handlers.onOp?.(payload as MissionOp))
     .on('presence', { event: 'sync' }, () => handlers.onOnline?.(Object.keys(channel.presenceState())))
     .subscribe(async (status) => {

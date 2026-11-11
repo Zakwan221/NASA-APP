@@ -170,5 +170,5 @@ export const GUIDE_SCORE = [
   { label: 'Mission success', points: 40, text: 'Did it fly long enough and do its job?' },
   { label: 'Science', points: 25, text: 'How much science reached Earth.' },
   { label: 'Efficiency', points: 20, text: 'Data sent home, money left, a healthy spacecraft.' },
-  { label: 'Decisions', points: 15, text: 'Good choices when things go wrong in flight.' },
+  { label: 'Handling surprises', points: 15, text: 'How well your spacecraft rides out storms, junk and glitches.' },
 ]

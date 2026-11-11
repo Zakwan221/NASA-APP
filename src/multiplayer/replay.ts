@@ -7,7 +7,7 @@
 
 import {
   chooseEventOption,
-  runMonth,
+  flyMonth,
   startOperate,
   toggleInstrument,
   type FlightSpacecraft,
@@ -24,8 +24,9 @@ export function replayOps(craft: FlightSpacecraft, seed: number, ops: MissionOp[
       state = toggleInstrument(state, p.instrumentId, Boolean(p.on))
     } else if (op.kind === 'choice' && state.pending && p.month === state.month + 1 && typeof p.choice === 'number') {
       state = chooseEventOption(craft, state, p.choice)
-    } else if (op.kind === 'fly' && !state.pending && p.month === state.month + 1) {
-      state = runMonth(craft, state)
+    } else if (op.kind === 'fly' && p.month === state.month + 1) {
+      // Surprise events are answered automatically (see flyMonth)
+      state = flyMonth(craft, state)
     }
   }
   return state

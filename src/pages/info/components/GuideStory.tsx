@@ -292,7 +292,7 @@ export default function GuideStory() {
           <ul className="mt-4 space-y-2 text-sm">
             {[
               'Surprises happen: solar storms, space junk, a broken instrument.',
-              'You choose what to do. Each choice has a cost and a risk.',
+              'Mission control handles each surprise. A sturdy spacecraft rides them out best.',
               'Science only counts once its data reaches Earth.',
             ].map((line) => (
               <li key={line} className="flex gap-2 text-slate-300">

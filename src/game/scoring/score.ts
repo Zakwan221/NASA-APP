@@ -1,6 +1,6 @@
 /**
  * Mission score out of 100 (docs/PLAN.md):
- *   Mission success 40 · Science 25 · Resource efficiency 20 · Teamwork / decisions 15
+ *   Mission success 40 · Science 25 · Resource efficiency 20 · Handling surprises 15
  *
  * DRAFT from Adaam's side so the Report screen works. Zakwan owns scoring:
  * change the weights or rules here, the Report screen just shows what this returns.
@@ -106,21 +106,23 @@ export function scoreMission(s: OperateSummary, opts: { team: boolean } = { team
         : undefined,
   })
 
-  // ---- Teamwork (15) or, solo, decision quality ----
-  const decisions = s.log.filter((l) => l.decision)
-  const badOutcomes = decisions.filter((l) => l.tone === 'bad').length
-  const teamwork = Math.round(15 * (decisions.length ? 1 - badOutcomes / decisions.length : 1))
+  // ---- Handling surprises (15): how well the spacecraft rode out events ----
+  // Mission control answers every event with its standard response, so this
+  // rewards a sturdy design: spare power, a reliable radio, money in reserve.
+  const events = s.log.filter((l) => l.decision)
+  const badOutcomes = events.filter((l) => l.tone === 'bad').length
+  const teamwork = Math.round(15 * (events.length ? 1 - badOutcomes / events.length : 1))
   parts.push({
     key: 'teamwork',
-    label: opts.team ? 'Teamwork' : 'Decision quality',
+    label: 'Handling surprises',
     points: teamwork,
     max: 15,
-    reason: decisions.length
-      ? `${decisions.length} decision${decisions.length === 1 ? '' : 's'} during the mission, ${badOutcomes} ended badly.`
-      : 'No decisions were needed this time.',
+    reason: events.length
+      ? `${events.length} surprise${events.length === 1 ? '' : 's'} in flight${opts.team ? ' for the crew' : ''}, ${badOutcomes} ended badly.`
+      : 'No surprises this time: a smooth flight.',
     tip:
       teamwork < 15
-        ? 'Risky choices sometimes pay off, but every bad outcome costs points. Read the risk on each card before you choose.'
+        ? 'A sturdier spacecraft rides out surprises better: keep spare power and budget, and pick parts that work most of the time.'
         : undefined,
   })
 

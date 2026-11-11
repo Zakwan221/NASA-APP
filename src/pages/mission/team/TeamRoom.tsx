@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Check,
+  CircleCheck,
+  Circle,
   Map as MapIcon,
   Microscope,
   RadioTower,
@@ -16,7 +18,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { buildFlight } from '../../../game/engine/evaluate'
 import { rollLaunch, withLaunchDefaults } from '../../../game/engine/launch'
-import type { MissionEvent } from '../../../game/events/events'
 import { summarize, type FlightSpacecraft, type OperateState } from '../../../game/events/operate'
 import { nextRandom } from '../../../game/events/random'
 import { scoreMission } from '../../../game/scoring/score'
@@ -29,11 +30,12 @@ import {
   claimRole,
   launchMission,
   proposeVote,
+  readyToLaunch,
+  sendChat,
   startOperate,
   submitMissionResult,
   type CrewMember,
   type MissionState,
-  type VotePayload,
 } from '../../../multiplayer/missionApi'
 import { replayOps } from '../../../multiplayer/replay'
 import { errorText, useMissionRoom, type MissionRoom } from '../../../multiplayer/useMissionRoom'
@@ -44,6 +46,7 @@ import LeaderboardTable from '../leaderboard/LeaderboardTable'
 import { scenarioName } from '../leaderboard/shared'
 import { OperateView, Shell } from '../operate/OperatePage'
 import ReportScreen from '../report/ReportScreen'
+import CrewChat from './CrewChat'
 import { roomDesign, useTeamEditor } from './useTeamEditor'
 
 const ROLES: { id: Role; name: string; icon: LucideIcon; job: string }[] = [
@@ -68,8 +71,9 @@ type Act = (fn: () => Promise<unknown>) => Promise<void>
 /**
  * /mission/team/:code, the same mission on every phone in the crew (up to 4):
  * Lobby (roles) → Design together (each role builds its part, live)
- * → vote to go to the pad → Launch (everyone sees the same launch)
- * → Fly month by month (votes on events) → Report + leaderboard → redesign.
+ * → vote to go to the pad → Launch together (everyone taps Launch, everyone sees the same launch)
+ * → Fly month by month (mission control handles surprises) → Report + leaderboard → redesign.
+ * A live crew chat floats over every screen.
  */
 export default function TeamRoom() {
   const { code = '' } = useParams()
@@ -150,6 +154,21 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
     </>
   )
 
+  const chat = (
+    <CrewChat
+      messages={m.chat}
+      userId={userId}
+      onSend={async (text) => {
+        try {
+          await sendChat(room.room_id, text)
+        } catch (e) {
+          m.setError(errorText(e))
+          throw e
+        }
+      }}
+    />
+  )
+
   /* ---------- Design: the crew builds one spacecraft together ---------- */
   if (room.phase === 'design') {
     const solo = room.crew.length === 1
@@ -170,6 +189,7 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
           }
         />
         <AdvanceVote m={m} room={room} userId={userId} isHost={isHost} act={act} />
+        {chat}
       </DesignEditorContext.Provider>
     )
   }
@@ -178,7 +198,8 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
   if (room.phase === 'launch') {
     return (
       <>
-        <TeamLaunch room={room} flying={flying} launch={launch} isHost={isHost} hostName={hostName} act={act} />
+        <TeamLaunch room={room} flying={flying} launch={launch} isHost={isHost} hostName={hostName} userId={userId} act={act} />
+        {chat}
         {m.error && (
           <div className="fixed inset-x-0 top-20 z-[80] mx-auto max-w-md px-3">
             <ErrorBox text={m.error} onClose={() => m.setError(null)} />
@@ -191,6 +212,7 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
   return (
     <Shell>
       {banners}
+      {chat}
       {room.phase === 'lobby' ? (
         <Lobby
           code={code}
@@ -211,22 +233,8 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
             canToggle ? undefined : `Only the Science Lead (${scienceHolder?.nickname ?? 'the host'}) can switch instruments.`
           }
           onToggle={(id, on) => act(() => addMissionOp(room.room_id, 'toggle', { instrumentId: id, on }))}
-          onChoose={() => {}}
           onFly={() => {}}
           banner={<RoleCard role={room.my_role} isHost={isHost} state={opState} craft={craft} />}
-          renderChoices={(event) => (
-            <EventVote
-              event={event}
-              vote={m.vote}
-              month={opState.month + 1}
-              userId={userId}
-              isHost={isHost}
-              crew={room.crew}
-              onPropose={(choice) => act(() => proposeVote(room.room_id, 'event', { choice, month: opState.month + 1 }))}
-              onBallot={(yes) => m.vote && act(() => castBallot(m.vote!.vote_id, yes))}
-              onDecide={(choice) => act(() => addMissionOp(room.room_id, 'choice', { choice, month: opState.month + 1 }))}
-            />
-          )}
           flyControl={
             isHost ? (
               <button
@@ -482,6 +490,7 @@ function TeamLaunch({
   launch,
   isHost,
   hostName,
+  userId,
   act,
 }: {
   room: MissionState
@@ -489,6 +498,7 @@ function TeamLaunch({
   launch: ReturnType<typeof launchFromSeed> | null
   isHost: boolean
   hostName: string
+  userId: string | null
   act: Act
 }) {
   const roll = useMemo(
@@ -497,21 +507,93 @@ function TeamLaunch({
   )
   // The launch report shows once this phone has played the animation
   const [playedKey, setPlayedKey] = useState<string | null>(null)
-  const done = roll && playedKey === roll.key ? roll.outcome : null
+  const ready = room.launch_ready ?? []
+  const iAmReady = userId ? ready.includes(userId) : false
+  // After a failed launch, tapping "Try again" takes you back to the ready check
+  const done = roll && playedKey === roll.key && !iAmReady ? roll.outcome : null
   const host = isHost ? (fn: () => Promise<unknown>) => () => void act(fn) : () => null
+  const tapLaunch = () => void act(() => readyToLaunch(room.room_id, true))
+  const waitingCount = room.crew.length - ready.length
+
   return (
     <LaunchStage
       design={flying}
       roll={roll}
       done={done}
       onPlayed={() => roll && setPlayedKey(roll.key)}
-      onLaunch={host(() => launchMission(room.room_id))}
+      onLaunch={iAmReady ? null : tapLaunch}
       onBack={host(() => backToDesign(room.room_id))}
       onFly={host(() => startOperate(room.room_id))}
-      onRetry={host(() => launchMission(room.room_id))}
+      onRetry={tapLaunch}
       onChange={host(() => backToDesign(room.room_id))}
-      waitingFor={hostName === 'you' ? 'the Flight Director' : `${hostName} (Flight Director)`}
+      waitingFor={
+        iAmReady
+          ? `${waitingCount} more crew member${waitingCount === 1 ? '' : 's'}`
+          : hostName === 'you'
+            ? 'the Flight Director'
+            : `${hostName} (Flight Director)`
+      }
+      banner={
+        room.crew.length > 1 && (!done || done.tone === 'fail') ? (
+          <ReadyCheck crew={room.crew} ready={ready} userId={userId} isHost={isHost} onLaunchNow={() => void act(() => launchMission(room.room_id))} />
+        ) : undefined
+      }
     />
+  )
+}
+
+/** Who has tapped Launch. The rocket goes when the whole crew is ready. */
+function ReadyCheck({
+  crew,
+  ready,
+  userId,
+  isHost,
+  onLaunchNow,
+}: {
+  crew: CrewMember[]
+  ready: string[]
+  userId: string | null
+  isHost: boolean
+  onLaunchNow: () => void
+}) {
+  return (
+    <div className="pointer-events-auto w-full max-w-md rounded-2xl border border-white/15 bg-space-900/85 p-3 shadow-xl backdrop-blur-md">
+      <p className="flex items-center justify-between gap-2 text-sm font-semibold">
+        <span className="flex items-center gap-1.5">
+          <Rocket aria-hidden="true" className="size-4 text-cyan-300" /> Launch together: everyone taps Launch
+        </span>
+        <span className="tabular-nums text-cyan-200">
+          {ready.length}/{crew.length}
+        </span>
+      </p>
+      <ul className="mt-2 flex flex-wrap gap-1.5">
+        {crew.map((c) => {
+          const ok = ready.includes(c.user_id)
+          return (
+            <motion.li
+              key={c.user_id}
+              animate={ok ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+              transition={{ duration: 0.35 }}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                ok ? 'bg-emerald-400/20 text-emerald-100' : 'bg-white/10 text-slate-300'
+              }`}
+            >
+              {ok ? <CircleCheck aria-hidden="true" className="size-3.5 text-emerald-300" /> : <Circle aria-hidden="true" className="size-3.5" />}
+              {c.user_id === userId ? 'You' : c.nickname}
+            </motion.li>
+          )
+        })}
+      </ul>
+      {isHost && ready.length < crew.length && (
+        <button
+          type="button"
+          onClick={onLaunchNow}
+          className="mt-2 min-h-9 text-xs font-semibold text-slate-400 underline-offset-4 hover:text-white hover:underline"
+        >
+          Someone away? Launch now without them
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -562,87 +644,6 @@ function RoleCard({ role, isHost, state, craft }: { role: Role | null; isHost: b
         </span>
       )}
     </section>
-  )
-}
-
-/* ---------------- operate: event vote ---------------- */
-
-function EventVote(props: {
-  event: MissionEvent
-  vote: VotePayload | null
-  month: number
-  userId: string | null
-  isHost: boolean
-  crew: CrewMember[]
-  onPropose: (choice: number) => void
-  onBallot: (yes: boolean) => void
-  onDecide: (choice: number) => void
-}) {
-  const { event, vote } = props
-  const open = vote && vote.topic === 'event' && vote.proposal.month === props.month ? vote : null
-  const proposed = open ? event.choices[Number(open.proposal.choice)] : null
-  const iVoted = open && props.userId ? open.voted.includes(props.userId) : false
-  const proposer = open ? props.crew.find((c) => c.user_id === open.proposed_by)?.nickname : null
-
-  if (open && proposed) {
-    return (
-      <div className="mt-4 rounded-xl border border-cyan-300/30 bg-cyan-300/5 p-4">
-        <p className="text-sm text-slate-300">{proposer ?? 'Someone'} proposes:</p>
-        <p className="mt-1 text-lg font-semibold">{proposed.label}</p>
-        <p className="text-sm text-slate-400">{proposed.hint}</p>
-        <p className="mt-3 flex items-center gap-3 text-sm tabular-nums text-slate-300">
-          <span className="flex items-center gap-1">
-            <ThumbsUp aria-hidden="true" className="size-4 text-emerald-300" /> {open.yes}
-          </span>
-          <span className="flex items-center gap-1">
-            <ThumbsDown aria-hidden="true" className="size-4 text-rose-300" /> {open.no}
-          </span>
-          <span className="text-slate-400">needs more than half of {open.crew_size}</span>
-        </p>
-        <div className="mt-3 flex flex-wrap gap-3">
-          {iVoted ? (
-            <p className="text-sm text-slate-400">You voted. Waiting for the others…</p>
-          ) : (
-            <>
-              <button type="button" onClick={() => props.onBallot(true)} className={`bg-emerald-500 hover:bg-emerald-400 ${button}`}>
-                Agree
-              </button>
-              <button type="button" onClick={() => props.onBallot(false)} className={`bg-white/10 hover:bg-white/20 ${button}`}>
-                Disagree
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="mt-4">
-      <p className="mb-3 text-sm text-slate-300">Propose a choice. The crew votes, and more than half must agree.</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {event.choices.map((c, idx) => (
-          <div key={c.label} className="rounded-xl border border-white/15 p-4">
-            <span className="block font-semibold">{c.label}</span>
-            <span className="text-sm text-slate-400">{c.hint}</span>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={() => props.onPropose(idx)} className={`bg-violet-500 hover:bg-violet-400 ${button}`}>
-                Propose
-              </button>
-              {props.isHost && props.crew.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => props.onDecide(idx)}
-                  className="min-h-11 text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
-                >
-                  Decide now
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }
 

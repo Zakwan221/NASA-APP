@@ -4,7 +4,7 @@
  * the recommended builds really win, and to show their expected score.
  */
 
-import { chooseEventOption, runMonth, startOperate, summarize } from '../events/operate'
+import { flyMonth, startOperate, summarize } from '../events/operate'
 import { scoreMission } from '../scoring/score'
 import type { MissionDesign } from '../types'
 import { buildFlight } from './evaluate'
@@ -27,7 +27,7 @@ export function testFlights(design: MissionDesign, flights = 20): TestFlights | 
   for (let n = 0; n < flights; n++) {
     let state = startOperate(craft, 1000 + n * 7919)
     for (let guard = 0; guard < 120 && !state.ended; guard++) {
-      state = state.pending ? chooseEventOption(craft, state, 0) : runMonth(craft, state)
+      state = flyMonth(craft, state)
     }
     const summary = summarize(craft, state)
     if (summary.success && summary.monthsFlown >= summary.plannedMonths) completed++

@@ -197,13 +197,23 @@ export function chooseEventOption(craft: FlightSpacecraft, state: OperateState, 
       ...result.state.log,
       {
         month: state.month + 1,
-        title: `${event.title}: ${choice.label}`,
+        title: `${event.title}: mission control chose “${choice.label}”`,
         text: result.message,
         tone: result.tone,
         decision: true,
       },
     ],
   }
+}
+
+/**
+ * Fly one month. If a surprise event starts, mission control answers it at once
+ * with its standard response (the first choice: safe mode, move out of the way,
+ * reboot…), so the game never stops for a question. The outcome goes in the log.
+ */
+export function flyMonth(craft: FlightSpacecraft, state: OperateState): OperateState {
+  const next = runMonth(craft, state.pending ? chooseEventOption(craft, state, 0) : state)
+  return next.pending && !next.ended ? chooseEventOption(craft, next, 0) : next
 }
 
 /* ---------------- the month ---------------- */
