@@ -31,8 +31,7 @@ src/
 └── pages/
     ├── home/                # Module 1 – Home page  ("/")
     │   ├── HomePage.tsx
-    │   ├── components/      # Hero, EarthScene, AsteroidStat, ApodSection, HowItWorks
-    │   └── assets/          # earth.jpg (home-only images)
+    │   └── components/      # SolarStory (scroll 3D: Earth → spacecraft → solar system), AsteroidStat, ApodSection, HowItWorks
     ├── info/                # Module 2 – NASA stories ("/info")
     │   ├── InfoPage.tsx
     │   └── components/
