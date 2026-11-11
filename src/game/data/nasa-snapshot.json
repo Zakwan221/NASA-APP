@@ -1,0 +1,45 @@
+{
+  "fetchedAt": "2026-11-11T20:05:49.979Z",
+  "fires": {
+    "total": 118,
+    "nearMalaysia": 75,
+    "nearest": [
+      {
+        "title": "in Indonesia 1032487",
+        "date": "2026-09-14T19:00:00Z",
+        "lat": -1.1860830314843,
+        "lon": 104.24645426704,
+        "distanceKm": 559,
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_24961"
+      },
+      {
+        "title": "in Indonesia 1032648",
+        "date": "2026-09-27T19:00:00Z",
+        "lat": -1.3500397154154,
+        "lon": 104.09826473943,
+        "distanceKm": 567,
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_25148"
+      },
+      {
+        "title": "in Indonesia 1032797",
+        "date": "2026-10-02T19:00:00Z",
+        "lat": -1.4988234841453,
+        "lon": 104.40421371006,
+        "distanceKm": 598,
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_25307"
+      }
+    ],
+    "newestDate": "2026-10-28T19:00:00Z"
+  },
+  "storms": null,
+  "asteroid": {
+    "name": "2013 VO5",
+    "date": "2026-11-11",
+    "diameterMeters": 230,
+    "missDistanceKm": 20596821,
+    "velocityKmh": 98907,
+    "hazardous": true,
+    "link": "https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=3653537",
+    "passingToday": 5
+  }
+}
