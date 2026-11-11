@@ -1,34 +1,35 @@
 import { motion } from 'framer-motion'
+import { BookOpen, Rocket, Trophy, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Section from '../../../components/ui/Section'
 
-const STEPS = [
+const STEPS: { icon: LucideIcon; title: string; text: string; to: string; accent: string }[] = [
   {
-    icon: '🔭',
+    icon: BookOpen,
     title: 'Learn',
-    text: 'Dive into interactive, animated stories built from real NASA data.',
+    text: 'See every spacecraft part in 3D and learn how to win each mission.',
     to: '/info',
     accent: 'text-cyan-300',
   },
   {
-    icon: '🎮',
+    icon: Rocket,
     title: 'Play',
-    text: 'Join a live multiplayer space quiz with your friends in seconds.',
-    to: '/games',
+    text: 'Build a spacecraft, launch it and fly a real NASA-style mission, solo or with a team.',
+    to: '/mission',
     accent: 'text-violet-300',
   },
   {
-    icon: '🏆',
+    icon: Trophy,
     title: 'Compete',
-    text: 'Climb the leaderboard against friends and players worldwide.',
-    to: '/games',
+    text: 'Post your score and climb the leaderboard against other players.',
+    to: '/mission/leaderboard',
     accent: 'text-amber-300',
   },
 ]
 
 export default function HowItWorks() {
   return (
-    <Section eyebrow="How it works" title="Learn it. Play it. Own the leaderboard.">
+    <Section eyebrow="How it works" title="Learn it. Fly it. Own the leaderboard.">
       <ul className="grid gap-4 md:grid-cols-3">
         {STEPS.map((step, i) => (
           <motion.li
@@ -43,7 +44,9 @@ export default function HowItWorks() {
               className="card group flex h-full flex-col p-6 transition hover:-translate-y-1 hover:border-white/25"
             >
               <div className="mb-4 flex items-center justify-between">
-                <span className="text-3xl" aria-hidden="true">{step.icon}</span>
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-white/[0.06]">
+                  <step.icon aria-hidden="true" className={`size-6 ${step.accent}`} />
+                </span>
                 <span className="font-display text-sm text-slate-500">0{i + 1}</span>
               </div>
               <h3 className={`text-xl font-bold ${step.accent}`}>{step.title}</h3>

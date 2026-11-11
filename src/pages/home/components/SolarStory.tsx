@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ChevronDown, Rocket, Sparkles } from 'lucide-react'
+import { BookOpen, ChevronDown, Rocket, Sparkles } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -90,7 +90,7 @@ export default function SolarStory() {
             <h1 className="bg-gradient-to-r from-cyan-200 via-white to-violet-300 bg-clip-text font-display text-6xl font-bold tracking-tight text-transparent sm:text-8xl">
               Orbitly
             </h1>
-            <p className="mt-3 text-lg text-slate-200 sm:text-xl [text-shadow:0_1px_12px_rgba(0,0,0,0.8)]">Explore space. Play with friends.</p>
+            <p className="mt-3 text-lg text-slate-200 sm:text-xl [text-shadow:0_1px_12px_rgba(0,0,0,0.8)]">Design it. Launch it. Fly it.</p>
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <Link
                 to="/mission"
@@ -99,10 +99,10 @@ export default function SolarStory() {
                 <Rocket aria-hidden="true" className="size-4" /> Design a mission
               </Link>
               <Link
-                to="/games"
-                className="inline-flex min-h-12 items-center rounded-full border border-violet-400/60 bg-violet-500/15 px-6 font-semibold text-violet-100 backdrop-blur transition hover:bg-violet-500/30"
+                to="/info"
+                className="inline-flex min-h-12 items-center gap-2 rounded-full border border-violet-400/60 bg-violet-500/15 px-6 font-semibold text-violet-100 backdrop-blur transition hover:bg-violet-500/30"
               >
-                Play Quiz
+                <BookOpen aria-hidden="true" className="size-4" /> How to play
               </Link>
             </div>
           </motion.div>

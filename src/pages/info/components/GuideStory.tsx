@@ -31,13 +31,13 @@ const EASE_OUT = [0.23, 1, 0.32, 1] as const
 /** One screen of the guide. The 3D sits right (desktop) or above (phone). */
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto flex h-svh max-w-6xl flex-col justify-end px-3 pb-4 pt-20 sm:px-6 lg:justify-center lg:pb-0">
+    <div className="mx-auto flex h-svh max-w-6xl flex-col justify-end px-3 pb-4 pt-36 sm:px-6 lg:justify-center lg:pt-32 lg:pb-0">
       <motion.div
         initial={{ opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ amount: 0.55 }}
         transition={{ duration: 0.6, ease: EASE_OUT }}
-        className="pointer-events-auto max-h-[58svh] w-full overflow-y-auto rounded-3xl border border-white/10 bg-space-950/75 p-5 shadow-2xl backdrop-blur-md sm:p-6 lg:max-h-none lg:max-w-md lg:overflow-visible"
+        className="pointer-events-auto max-h-[58svh] w-full overflow-y-auto lg-glass rounded-3xl p-5 sm:p-6 lg:max-h-none lg:max-w-md lg:overflow-visible"
       >
         {children}
       </motion.div>

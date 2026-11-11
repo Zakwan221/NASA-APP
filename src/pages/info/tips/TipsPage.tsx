@@ -9,6 +9,8 @@ import { RECOMMENDED } from '../../../game/data/recommended'
 import { testFlights } from '../../../game/engine/simulate'
 import type { MissionDesign } from '../../../game/types'
 import { useMission } from '../../../store/missionStore'
+import { CinematicHeader } from '../components/Cinematic'
+import { trackSpotlight } from '../components/spotlight'
 import { DIFFICULTY_TIPS, GENERAL_TIPS, MISSION_TIPS, SCORE_TIPS } from './tipsContent'
 
 const Viewer3D = lazy(() => import('../components/Viewer3D'))
@@ -16,8 +18,19 @@ const ThumbnailStudio = lazy(() => import('../../../components/space/thumbnails'
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
-const MISSION_ICON = { 'earth-watch': Earth, 'solar-storm': Sun, 'asteroid-scout': Orbit } as const
-const RESOURCE_WORD: Record<string, string> = { mass: 'Mass', power: 'Power', budget: 'Budget', data: 'Data', comms: 'Comms', lifetime: 'Lifetime' }
+const MISSION_ICON = {
+  'earth-watch': Earth,
+  'solar-storm': Sun,
+  'asteroid-scout': Orbit,
+} as const
+const RESOURCE_WORD: Record<string, string> = {
+  mass: 'Mass',
+  power: 'Power',
+  budget: 'Budget',
+  data: 'Data',
+  comms: 'Comms',
+  lifetime: 'Lifetime',
+}
 
 /** The builds never change, so fly each one once (20 flights take a few milliseconds) */
 const flightCache = new Map<string, ReturnType<typeof testFlights>>()
@@ -39,7 +52,10 @@ function buildItems(d: MissionDesign) {
     ...part(d.engineer.computerId),
     ...part(d.engineer.attitudeId),
     ...part(d.comms.radioId),
-    ...d.science.instrumentIds.map((id) => ({ key: `instrument:${id}`, name: instrumentById(id)?.name ?? id })),
+    ...d.science.instrumentIds.map((id) => ({
+      key: `instrument:${id}`,
+      name: instrumentById(id)?.name ?? id,
+    })),
   ]
 }
 
@@ -56,19 +72,19 @@ export default function TipsPage() {
   const flights = flightsFor(missionId, rec.design)
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-20 pt-32 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-40 sm:px-6">
       <Suspense fallback={null}>
         <ThumbnailStudio />
       </Suspense>
 
-      <header className="max-w-2xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Tips to win</p>
-        <h1 className="mt-1 font-display text-3xl font-bold sm:text-5xl">How to get a high score</h1>
-        <p className="mt-3 text-slate-300 sm:text-lg">Four ways to earn points, then a tested winning build for each mission.</p>
-      </header>
+      <CinematicHeader
+        eyebrow="Tips to win"
+        title="How to get a high score"
+        text="Four ways to earn points, then a tested winning build for each mission."
+      />
 
       {/* The four parts of the score */}
-      <section aria-label="How the score works" className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="How the score works" className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {SCORE_TIPS.map((s, i) => (
           <motion.article
             key={s.label}
@@ -76,11 +92,12 @@ export default function TipsPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, ease: EASE_OUT, delay: i * 0.08 }}
-            className="card p-5"
+            onPointerMove={trackSpotlight}
+            className="lg-card rounded-2xl p-5"
           >
             <p className="flex items-baseline justify-between">
               <span className="font-semibold">{s.label}</span>
-              <span className="font-display text-2xl font-bold text-cyan-300">{s.points}</span>
+              <span className="font-display text-4xl font-bold text-cyan-200 [text-shadow:0_0_24px_rgba(34,211,238,0.6)]">{s.points}</span>
             </p>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
               <motion.div
@@ -88,7 +105,11 @@ export default function TipsPage() {
                 initial={{ width: 0 }}
                 whileInView={{ width: `${(s.points / 40) * 100}%` }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.9, ease: EASE_OUT, delay: 0.2 + i * 0.08 }}
+                transition={{
+                  duration: 0.9,
+                  ease: EASE_OUT,
+                  delay: 0.2 + i * 0.08,
+                }}
               />
             </div>
             <p className="mt-3 text-sm text-slate-300">{s.how}</p>
@@ -100,12 +121,12 @@ export default function TipsPage() {
       </section>
 
       {/* Mission tabs */}
-      <section className="mt-14" aria-labelledby="missions-h">
-        <h2 id="missions-h" className="text-2xl font-bold sm:text-3xl">
+      <section className="mt-20" aria-labelledby="missions-h">
+        <h2 id="missions-h" className="lg-title text-3xl font-bold sm:text-4xl">
           Winning builds
         </h2>
         <p className="mt-1 text-slate-400">Each one is flown 20 times through the real game. Pick a mission:</p>
-        <div role="tablist" aria-label="Mission" className="mt-4 flex flex-wrap gap-2">
+        <div role="tablist" aria-label="Mission" className="lg-glass mt-5 inline-flex max-w-full flex-wrap gap-1 rounded-3xl p-1.5 sm:rounded-full">
           {RECOMMENDED.map((r) => {
             const s = SCENARIOS.find((x) => x.id === r.scenarioId)!
             const Icon = MISSION_ICON[r.scenarioId as keyof typeof MISSION_ICON] ?? Target
@@ -117,12 +138,19 @@ export default function TipsPage() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setMissionId(r.scenarioId)}
-                className={`flex min-h-12 items-center gap-2 rounded-full px-5 font-semibold transition ${
-                  active ? 'bg-cyan-400 text-space-950 shadow-[0_0_24px_-6px_rgba(34,211,238,0.8)]' : 'bg-white/[0.07] text-slate-200 hover:bg-white/15'
+                className={`relative flex min-h-11 items-center gap-2 rounded-full px-4 font-semibold transition-colors sm:px-5 ${
+                  active ? 'text-space-950' : 'text-slate-200 hover:text-white'
                 }`}
               >
-                <Icon aria-hidden="true" className="size-5" />
-                {s.title.split(':')[0]}
+                {active && (
+                  <motion.span
+                    layoutId="mission-drop"
+                    className="lg-drop absolute inset-0 rounded-full"
+                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                  />
+                )}
+                <Icon aria-hidden="true" className="relative size-5" />
+                <span className="relative">{s.title.split(':')[0]}</span>
               </button>
             )
           })}
@@ -139,14 +167,14 @@ export default function TipsPage() {
             className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]"
           >
             {/* Left: the spacecraft in 3D + result */}
-            <div className="card overflow-hidden">
+            <div className="lg-card overflow-hidden rounded-3xl">
               <div className="relative h-72 bg-[radial-gradient(ellipse_at_50%_40%,rgba(56,189,248,0.18),#020309_70%)] sm:h-96">
                 <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-400">Loading 3D…</div>}>
                   <Viewer3D margin={1.15}>
                     <CraftModel design={rec.design} instant />
                   </Viewer3D>
                 </Suspense>
-                <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-xs text-slate-200">
+                <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full lg-glass px-3 py-1 text-xs text-slate-200">
                   <Rotate3d aria-hidden="true" className="size-3.5" /> Drag to turn it
                 </p>
               </div>
@@ -160,9 +188,9 @@ export default function TipsPage() {
                   ))}
                 </p>
                 {flights && (
-                  <div className="mt-4 rounded-2xl bg-emerald-400/10 p-4">
+                  <div className="mt-4 rounded-2xl border border-emerald-300/20 bg-gradient-to-br from-emerald-400/15 to-cyan-400/5 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
                     <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">Tested in 20 flights (Engineer)</p>
-                    <p className="mt-1 font-display text-4xl font-bold tabular-nums text-emerald-300">
+                    <p className="mt-1 font-display text-5xl font-bold tabular-nums text-emerald-300 [text-shadow:0_0_30px_rgba(52,211,153,0.55)]">
                       {flights.average}
                       <span className="text-lg text-emerald-200/80"> / 100 on average</span>
                     </p>
@@ -186,7 +214,7 @@ export default function TipsPage() {
 
             {/* Right: every choice and why, then tips */}
             <div className="space-y-5">
-              <div className="card p-5">
+              <div onPointerMove={trackSpotlight} className="lg-card rounded-3xl p-5">
                 <h3 className="font-semibold">The build</h3>
                 <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-4">
                   {buildItems(rec.design).map((it) => (
@@ -215,7 +243,7 @@ export default function TipsPage() {
                 </ul>
               </div>
 
-              <div className="card p-5">
+              <div onPointerMove={trackSpotlight} className="lg-card rounded-3xl p-5">
                 <h3 className="font-semibold">Tips</h3>
                 <ul className="mt-3 space-y-2 text-sm">
                   {tips.tips.map((t) => (
@@ -239,8 +267,8 @@ export default function TipsPage() {
       </section>
 
       {/* Difficulty + general */}
-      <section className="mt-14 grid gap-5 lg:grid-cols-2" aria-label="More tips">
-        <div className="card p-5">
+      <section className="mt-20 grid gap-5 lg:grid-cols-2" aria-label="More tips">
+        <div onPointerMove={trackSpotlight} className="lg-card rounded-3xl p-5">
           <h2 className="text-xl font-bold">Game modes</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {DIFFICULTY_TIPS.map((d) => (
@@ -250,7 +278,7 @@ export default function TipsPage() {
             ))}
           </ul>
         </div>
-        <div className="card p-5">
+        <div onPointerMove={trackSpotlight} className="lg-card rounded-3xl p-5">
           <h2 className="text-xl font-bold">Before you press Launch</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {GENERAL_TIPS.map((t) => (
