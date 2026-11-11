@@ -7,7 +7,7 @@ import { evaluate, limitsFor } from '../../../game/engine/evaluate'
 import type { Difficulty, ResourceKey } from '../../../game/types'
 import { useMission } from '../../../store/missionStore'
 import Builder from './Builder'
-import { BUILD_STEPS } from './buildSteps'
+import { BUILD_STEPS, stepDone } from './buildSteps'
 import PhaseSteps from './components/PhaseSteps'
 
 const DIFFICULTIES: { id: Difficulty; label: string; icon: LucideIcon; text: string }[] = [
@@ -63,14 +63,8 @@ export default function DesignPage() {
   const goStep = (n: number) => setParams({ build: String(n) }, { replace: true })
   const startBuilding = () => {
     // Continue where the player stopped: the first step that still needs a choice
-    const first = BUILD_STEPS.findIndex((s) =>
-      s.slot
-        ? !(s.slot === 'radio' ? design.comms.radioId : design.engineer[s.slot])
-        : s.id === 'instruments'
-          ? design.science.instrumentIds.length === 0
-          : true,
-    )
-    setParams({ build: String(Math.max(0, first)) })
+    const first = BUILD_STEPS.findIndex((s) => !stepDone(design, s))
+    setParams({ build: String(first < 0 ? BUILD_STEPS.length - 1 : first) })
   }
 
   if (step !== null && scenarioId) {

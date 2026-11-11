@@ -105,7 +105,7 @@ const ATMOS_FRAG = /* glsl */ `
   varying vec3 vNormal;
   void main() {
     float rim = pow(0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
-    gl_FragColor = vec4(0.32, 0.62, 1.0, 1.0) * rim * 1.6;
+    gl_FragColor = vec4(0.32, 0.62, 1.0, 1.0) * rim * 0.95;
   }
 `
 

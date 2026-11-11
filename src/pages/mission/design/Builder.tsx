@@ -1,14 +1,15 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, Rocket, Rotate3d } from 'lucide-react'
-import { lazy, Suspense, useEffect, useMemo } from 'react'
-import { INSTRUMENTS, partById, partsIn } from '../../../game/data'
+import { ChevronLeft, CircleCheck, Rocket, Rotate3d, TriangleAlert } from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { INSTRUMENTS, ORBITS, partById, partsIn, ROCKETS } from '../../../game/data'
 import { evaluate } from '../../../game/engine/evaluate'
-import type { Part, Warning } from '../../../game/types'
+import { failureChance } from '../../../game/engine/launch'
+import type { Part } from '../../../game/types'
 import { useMission } from '../../../store/missionStore'
-import Dashboard, { MiniStatus, WarningList } from './components/Dashboard'
+import { BUILD_STEPS, stepDone, type Slot } from './buildSteps'
 import { DndProvider, DropZone, type DragItem } from './components/dnd'
 import OptionCard from './components/OptionCard'
-import { BUILD_STEPS, type BuildStep, type Slot } from './buildSteps'
+import { WarningList } from './components/Warnings'
 
 const CraftScene = lazy(() => import('./components/CraftScene'))
 
@@ -18,33 +19,37 @@ const fmtStorage = (mbit: number) => (mbit >= 8000 ? `${Math.round(mbit / 8000)}
 const fmtRange = (km: number) =>
   km >= 100_000_000 ? 'Deep space' : km >= 1_000_000 ? `${(km / 1_000_000).toFixed(1)}M km` : `${km.toLocaleString()} km`
 const fmtRate = (kbps: number) => (kbps >= 1000 ? `${kbps / 1000} Mbps` : `${kbps} kbps`)
+const pct = (n: number) => `${Math.round(n * 100)}%`
 
-/** The numbers worth showing for each kind of part */
+/** A part's numbers, with the one that makes it special first */
 function partStats(p: Part) {
-  const stats = [
-    { label: 'Mass', value: `${p.massKg} kg` },
-    { label: 'Cost', value: `$${p.costM} M` },
-  ]
-  if (p.powerDrawW) stats.push({ label: 'Uses', value: `${p.powerDrawW} W` })
+  const stats: { label: string; value: string }[] = []
   if (p.maxLoadKg) stats.push({ label: 'Carries', value: `${p.maxLoadKg} kg` })
   if (p.powerGenW) stats.push({ label: 'Makes', value: `${p.powerGenW} W` })
   if (p.capacityWh) stats.push({ label: 'Stores', value: `${p.capacityWh} Wh` })
   if (p.storageMbit) stats.push({ label: 'Storage', value: fmtStorage(p.storageMbit) })
   if (p.dataRateKbps) stats.push({ label: 'Speed', value: fmtRate(p.dataRateKbps) })
-  if (p.maxRangeKm) stats.push({ label: 'Range', value: fmtRange(p.maxRangeKm) })
   if (p.pointingDeg !== undefined) stats.push({ label: 'Aims within', value: `${p.pointingDeg}°` })
+  stats.push({ label: 'Cost', value: `$${p.costM} M` }, { label: 'Mass', value: `${p.massKg} kg` })
+  if (p.maxRangeKm) stats.push({ label: 'Range', value: fmtRange(p.maxRangeKm) })
+  if (p.powerDrawW) stats.push({ label: 'Uses', value: `${p.powerDrawW} W` })
   return stats
 }
 
-const Badge = ({ tone, children }: { tone: 'violet' | 'green'; children: string }) => (
-  <span className={`rounded-full px-2 py-0.5 text-[11px] ${tone === 'violet' ? 'bg-violet-400/15 text-violet-200' : 'bg-emerald-400/15 text-emerald-200'}`}>
+const Badge = ({ tone, children }: { tone: 'violet' | 'green' | 'red'; children: string }) => (
+  <span
+    className={`rounded-full px-2 py-0.5 text-[11px] ${
+      tone === 'violet' ? 'bg-violet-400/15 text-violet-200' : tone === 'green' ? 'bg-emerald-400/15 text-emerald-200' : 'bg-rose-400/15 text-rose-200'
+    }`}
+  >
     {children}
   </span>
 )
 
 /**
- * Full-screen builder: the 3D spacecraft fills the screen and the player picks
- * one kind of part per step (tap a card, or drag it onto the spacecraft).
+ * Full-screen builder: the 3D spacecraft fills the screen and the player makes
+ * one choice per step (tap a card, or drag it onto the spacecraft). Nothing is
+ * required: every step can be skipped, and problems show up later in flight.
  */
 export default function Builder({
   step,
@@ -60,9 +65,12 @@ export default function Builder({
   const store = useMission()
   const { design } = store
   const ev = useMemo(() => evaluate(design), [design])
+  const [showProblems, setShowProblems] = useState(false)
   const current = BUILD_STEPS[step]
+  const last = step === BUILD_STEPS.length - 1
   const scenarioId = design.planner.scenarioId
-  const showAdvanced = design.planner.difficulty !== 'cadet'
+  const difficulty = design.planner.difficulty
+  const showAdvanced = difficulty !== 'cadet'
   const visible = <T extends { tier: string }>(items: T[]) => items.filter((i) => showAdvanced || i.tier === 'simple')
 
   // Full screen: stop the page behind from scrolling
@@ -87,15 +95,110 @@ export default function Builder({
     if (s) select(s, item.id)
   }
 
-  const stepDone = (s: BuildStep) =>
-    s.slot ? Boolean(selectedId(s.slot)) : s.id === 'instruments' ? design.science.instrumentIds.length > 0 : ev.designReady
-  const stepWarnings: Warning[] = ev.warnings.filter(
-    (w) => w.phase === 'design' && current.resources.includes(w.resource) && !(w.blocking && w.message.startsWith('Pick')),
-  )
-
+  // "Pick a …" reminders are not problems: skipped steps already show as not done
+  const problems = ev.warnings.filter((w) => !w.message.startsWith('Pick'))
+  const stepProblems = problems.filter((w) => current.resources.includes(w.resource))
   const instruments = visible(INSTRUMENTS).sort(
     (a, b) => Number(b.goodFor.includes(scenarioId ?? '')) - Number(a.goodFor.includes(scenarioId ?? '')),
   )
+  const orbit = ev.orbit
+
+  const cards = () => {
+    if (current.category) {
+      return visible(partsIn(current.category)).map((p) => (
+        <OptionCard
+          key={p.id}
+          name={p.name}
+          selected={selectedId(current.slot!) === p.id}
+          onSelect={() => select(current.slot!, p.id)}
+          stats={partStats(p)}
+          explain={p.explain}
+          source={p.source}
+          dragItem={{ kind: 'part', id: p.id, name: p.name }}
+          badge={p.tier === 'advanced' && <Badge tone="violet">Advanced</Badge>}
+        />
+      ))
+    }
+    if (current.id === 'instruments') {
+      return instruments.map((i) => (
+        <OptionCard
+          key={i.id}
+          multi
+          name={i.name}
+          selected={design.science.instrumentIds.includes(i.id)}
+          onSelect={() => store.toggleInstrument(i.id)}
+          dragItem={{ kind: 'instrument', id: i.id, name: i.name }}
+          stats={[
+            { label: 'Science', value: `${i.scienceValue}/day` },
+            { label: 'Cost', value: `$${i.costM} M` },
+            { label: 'Uses', value: `${i.powerDrawW} W` },
+            { label: 'Mass', value: `${i.massKg} kg` },
+            { label: 'Data/day', value: `${(i.dataPerDayMbit / 1000).toFixed(1)} Gbit` },
+            { label: 'Aim within', value: `${i.needsPointingDeg}°` },
+          ]}
+          explain={i.explain}
+          source={i.source}
+          badge={
+            scenarioId && i.goodFor.includes(scenarioId) ? (
+              <Badge tone="green">Good for this mission</Badge>
+            ) : (
+              <Badge tone="red">Not made for this mission</Badge>
+            )
+          }
+        />
+      ))
+    }
+    if (current.id === 'orbit') {
+      return ORBITS.map((o) => {
+        const view = ev.scenario ? (o.coverage[ev.scenario.id] ?? 0) : 0
+        return (
+          <OptionCard
+            key={o.id}
+            name={o.name}
+            selected={design.comms.orbitId === o.id}
+            onSelect={() => store.setOrbit(o.id)}
+            stats={[
+              { label: 'Sees target', value: pct(view) },
+              { label: 'Contact', value: o.contactMinPerDay >= 1440 ? 'All day' : `${o.contactMinPerDay} min/day` },
+              { label: 'Lasts', value: `${o.maxLifetimeMonths} months` },
+              { label: 'Distance', value: fmtRange(o.altitudeKm) },
+              { label: 'In shadow', value: pct(o.shadowFraction) },
+            ]}
+            explain={o.explain}
+            source={o.source}
+            badge={view >= 0.9 ? <Badge tone="green">Best view</Badge> : view === 0 ? <Badge tone="red">Can’t see the target</Badge> : undefined}
+          />
+        )
+      })
+    }
+    return ROCKETS.map((r) => {
+      const cap = orbit ? r.capacityKg[orbit.id] : undefined
+      return (
+        <OptionCard
+          key={r.id}
+          name={r.name}
+          selected={design.comms.launchVehicleId === r.id}
+          onSelect={() => store.setRocket(r.id)}
+          stats={[
+            { label: 'Works', value: `${pct(1 - failureChance(r, difficulty))} of the time` },
+            { label: 'Cost', value: `$${r.costM} M` },
+            { label: 'Carries', value: cap !== undefined ? `${cap.toLocaleString()} kg` : '—' },
+          ]}
+          explain={r.explain}
+          source={r.source}
+          badge={
+            !orbit ? undefined : cap === undefined ? (
+              <Badge tone="red">{`Can’t reach ${orbit.name}`}</Badge>
+            ) : ev.massKg <= cap ? (
+              <Badge tone="green">Strong enough</Badge>
+            ) : (
+              <Badge tone="red">{`Too weak: yours is ${ev.massKg} kg`}</Badge>
+            )
+          }
+        />
+      )
+    })
+  }
 
   return (
     <DndProvider>
@@ -106,7 +209,6 @@ export default function Builder({
             <CraftScene design={design} zoom={1.05} />
           </Suspense>
 
-          {/* Top bar over the 3D view */}
           <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-space-950/90 to-transparent p-3 pb-8">
             <div className="flex items-center justify-between gap-2">
               <button
@@ -119,41 +221,40 @@ export default function Builder({
               </button>
               <p className="text-right text-xs text-slate-300">
                 <span className="block font-semibold text-white">{ev.scenario?.title}</span>
-                {ev.massKg} kg · ${ev.buildCostM} M built
+                {ev.massKg} kg · ${ev.buildCostM} M of ${ev.limits.budgetM} M
               </p>
             </div>
-            <ol className="pointer-events-auto mt-3 flex gap-1.5 overflow-x-auto" aria-label="Build steps">
-              {BUILD_STEPS.map((s, i) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => onStep(i)}
-                    aria-current={i === step ? 'step' : undefined}
-                    title={s.title}
-                    className={`flex size-9 items-center justify-center rounded-full text-base transition ${
-                      i === step
-                        ? 'bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.7)]'
-                        : stepDone(s)
-                          ? 'bg-emerald-400/30'
-                          : 'bg-white/10 hover:bg-white/20'
-                    }`}
-                  >
-                    <s.icon aria-hidden="true" className={`size-4 ${i === step ? 'text-space-950' : 'text-white'}`} />
-                    <span className="sr-only">
-                      {s.title} {stepDone(s) ? '(done)' : ''}
-                    </span>
-                  </button>
-                </li>
-              ))}
+            <ol className="pointer-events-auto mt-3 flex gap-1" aria-label="Build steps">
+              {BUILD_STEPS.map((s, i) => {
+                const done = stepDone(design, s)
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => onStep(i)}
+                      aria-current={i === step ? 'step' : undefined}
+                      title={s.title}
+                      className={`flex size-8 items-center justify-center rounded-full transition ${
+                        i === step ? 'bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.7)]' : done ? 'bg-emerald-400/30' : 'bg-white/10 hover:bg-white/20'
+                      }`}
+                    >
+                      <s.icon aria-hidden="true" className={`size-4 ${i === step ? 'text-space-950' : 'text-white'}`} />
+                      <span className="sr-only">
+                        {s.title} {done ? '(done)' : ''}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
             </ol>
           </div>
-          <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-xs text-slate-200 backdrop-blur">
+          <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-black/40 px-3 py-1 text-xs text-slate-200 backdrop-blur">
             <Rotate3d aria-hidden="true" className="size-3.5" /> Hold and drag to turn it
           </p>
         </DropZone>
 
         {/* Choice panel: bottom sheet on phones, side panel on desktop */}
-        <section className="flex max-h-[55svh] flex-col border-t border-white/10 bg-space-900/95 backdrop-blur lg:max-h-none lg:w-[440px] lg:border-l lg:border-t-0">
+        <section className="relative flex max-h-[55svh] flex-col border-t border-white/10 bg-space-900/95 backdrop-blur lg:max-h-none lg:w-[440px] lg:border-l lg:border-t-0">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={current.id}
@@ -171,79 +272,51 @@ export default function Builder({
                   <current.icon aria-hidden="true" className="mr-2 inline size-5 -translate-y-0.5 text-cyan-300" />
                   {current.title}
                 </h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  {current.hint}
-                  {current.id !== 'review' && <span className="hidden sm:inline"> Tap a card or drag it onto the spacecraft.</span>}
-                </p>
+                <p className="mt-1 text-sm text-slate-300">{current.hint}</p>
               </header>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-                {current.id === 'review' ? (
-                  <Dashboard ev={ev} phase="design" />
-                ) : (
-                  <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 lg:mx-0 lg:grid lg:overflow-visible lg:px-0">
-                    {current.category
-                      ? visible(partsIn(current.category)).map((p) => (
-                          <div key={p.id} className="w-60 shrink-0 snap-start lg:w-auto">
-                            <OptionCard
-                              name={p.name}
-                              selected={selectedId(current.slot!) === p.id}
-                              onSelect={() => select(current.slot!, p.id)}
-                              stats={partStats(p)}
-                              explain={p.explain}
-                              source={p.source}
-                              dragItem={{ kind: 'part', id: p.id, name: p.name }}
-                              badge={p.tier === 'advanced' && <Badge tone="violet">Advanced</Badge>}
-                            />
-                          </div>
-                        ))
-                      : instruments.map((i) => {
-                          const fits = scenarioId ? i.goodFor.includes(scenarioId) : false
-                          return (
-                            <div key={i.id} className="w-60 shrink-0 snap-start lg:w-auto">
-                              <OptionCard
-                                multi
-                                name={i.name}
-                                selected={design.science.instrumentIds.includes(i.id)}
-                                onSelect={() => store.toggleInstrument(i.id)}
-                                dragItem={{ kind: 'instrument', id: i.id, name: i.name }}
-                                stats={[
-                                  { label: 'Mass', value: `${i.massKg} kg` },
-                                  { label: 'Cost', value: `$${i.costM} M` },
-                                  { label: 'Uses', value: `${i.powerDrawW} W` },
-                                  { label: 'Data/day', value: `${(i.dataPerDayMbit / 1000).toFixed(1)} Gbit` },
-                                  { label: 'Science', value: `${i.scienceValue}/day` },
-                                  { label: 'Aim within', value: `${i.needsPointingDeg}°` },
-                                ]}
-                                explain={i.explain}
-                                source={i.source}
-                                badge={
-                                  <span className="flex flex-wrap gap-1">
-                                    {fits && <Badge tone="green">Fits this mission</Badge>}
-                                    {i.tier === 'advanced' && <Badge tone="violet">Advanced</Badge>}
-                                  </span>
-                                }
-                              />
-                            </div>
-                          )
-                        })}
-                  </div>
-                )}
-
-                {current.id !== 'review' && stepWarnings.length > 0 && (
+                <div
+                  role={current.id === 'instruments' ? 'group' : 'radiogroup'}
+                  aria-label={current.title}
+                  className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 lg:mx-0 lg:grid lg:overflow-visible lg:px-0"
+                >
+                  {cards().map((card) => (
+                    <div key={card.key} className="w-64 shrink-0 snap-start lg:w-auto">
+                      {card}
+                    </div>
+                  ))}
+                </div>
+                {stepProblems.length > 0 && (
                   <div className="mt-3">
-                    <WarningList warnings={stepWarnings.slice(0, 2)} />
+                    <WarningList warnings={stepProblems.slice(0, 2)} />
                   </div>
                 )}
               </div>
             </motion.div>
           </AnimatePresence>
 
-          <footer className="flex items-center justify-between gap-2 border-t border-white/10 px-4 py-3">
-            <div className="hidden sm:block">
-              <MiniStatus ev={ev} />
+          {/* Every problem, on request */}
+          {showProblems && (
+            <div className="absolute inset-x-0 bottom-[72px] z-10 max-h-[60%] overflow-y-auto border-t border-white/10 bg-space-900 p-4 shadow-2xl">
+              <p className="mb-2 text-sm font-semibold">Things to check</p>
+              <WarningList warnings={problems} />
             </div>
-            <div className="flex flex-1 justify-end gap-2">
+          )}
+
+          <footer className="flex items-center justify-between gap-2 border-t border-white/10 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setShowProblems((v) => !v)}
+              aria-expanded={showProblems}
+              className={`flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold ${
+                problems.length ? 'bg-amber-300/15 text-amber-200' : 'bg-emerald-400/15 text-emerald-200'
+              }`}
+            >
+              {problems.length ? <TriangleAlert aria-hidden="true" className="size-4" /> : <CircleCheck aria-hidden="true" className="size-4" />}
+              {problems.length ? `${problems.length} to check` : 'All good'}
+            </button>
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => (step === 0 ? onExit() : onStep(step - 1))}
@@ -251,23 +324,21 @@ export default function Builder({
               >
                 Back
               </button>
-              {current.id === 'review' ? (
-                <button
-                  type="button"
-                  onClick={onFinish}
-                  className="glow-cyan min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400 disabled:shadow-none"
-                >
-                  Go to launch <Rocket aria-hidden="true" className="ml-1 inline size-4" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onStep(step + 1)}
-                  className="min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400"
-                >
-                  {stepDone(current) ? 'Next →' : 'Skip →'}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => (last ? onFinish() : onStep(step + 1))}
+                className="glow-cyan min-h-12 rounded-full bg-cyan-400 px-6 font-semibold text-space-950 transition hover:bg-cyan-300 active:scale-[0.98]"
+              >
+                {last ? (
+                  <>
+                    To the launch pad <Rocket aria-hidden="true" className="ml-1 inline size-4" />
+                  </>
+                ) : stepDone(design, current) ? (
+                  'Next →'
+                ) : (
+                  'Skip →'
+                )}
+              </button>
             </div>
           </footer>
         </section>

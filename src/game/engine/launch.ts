@@ -13,7 +13,7 @@
  * Plus an outlook: will this spacecraft be able to finish its mission?
  */
 
-import { orbitById, rocketById } from '../data'
+import { orbitById, rocketById, ROCKETS } from '../data'
 import { OPS } from '../events/operate'
 import type { Difficulty, LaunchVehicle, MissionDesign } from '../types'
 import { evaluate } from './evaluate'
@@ -280,4 +280,22 @@ export function missionOutlook(design: MissionDesign, extraCostM = 0): Outlook {
         ? 'Can complete the mission, but with weak spots.'
         : 'Unlikely to complete the mission as designed.'
   return { verdict, headline, checks }
+}
+
+/* ---------------- defaults ---------------- */
+
+/**
+ * Nothing blocks a launch: if the player skipped the orbit or rocket, pick the
+ * mission's first suitable orbit and the cheapest rocket that can carry the
+ * spacecraft there (or the biggest one that reaches it).
+ */
+export function withLaunchDefaults(design: MissionDesign): MissionDesign {
+  if (design.comms.orbitId && design.comms.launchVehicleId) return design
+  const ev = evaluate(design)
+  const orbitId = design.comms.orbitId ?? ev.scenario?.allowedOrbits[0] ?? 'sso'
+  const reaching = ROCKETS.filter((r) => r.capacityKg[orbitId] !== undefined).sort((a, b) => a.costM - b.costM)
+  const launchVehicleId =
+    design.comms.launchVehicleId ??
+    (reaching.find((r) => (r.capacityKg[orbitId] ?? 0) >= ev.massKg) ?? reaching.at(-1) ?? ROCKETS[0]).id
+  return { ...design, comms: { ...design.comms, orbitId, launchVehicleId } }
 }
