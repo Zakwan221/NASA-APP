@@ -6,13 +6,14 @@
  */
 
 import { Line, Stars } from '@react-three/drei'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import { Vector3, type Group, type Mesh, type MeshBasicMaterial } from 'three'
+import { AdditiveBlending, BufferAttribute, Vector3, type Group, type Mesh, type MeshBasicMaterial, type PerspectiveCamera, type Points } from 'three'
 import CraftModel from '../../../components/space/CraftModel'
 import { Earth, Sun } from '../../../components/space/SpaceBackdrop'
 import { useOnScreen } from '../../../components/space/useOnScreen'
 import ErrorBoundary from '../../../components/ui/ErrorBoundary'
+import type { EventId } from '../../../game/events/events'
 import type { MissionDesign, OrbitId } from '../../../game/types'
 
 const SUN_DIR = new Vector3(1, 0.2, 0.75).normalize()
@@ -38,7 +39,20 @@ const LOOK: Record<OrbitId, OrbitLook> = {
   'deep-space': { radius: 7, tilt: [0, 0], speed: 0, camera: [-4, 3, 12], away: true },
 }
 
-function Craft({ design, look, month, onStatus }: { design: MissionDesign; look: OrbitLook; month: number; onStatus: (s: Status) => void }) {
+function Craft({
+  design,
+  look,
+  month,
+  effect,
+  onStatus,
+}: {
+  design: MissionDesign
+  look: OrbitLook
+  month: number
+  effect: EventId | null
+  onStatus: (s: Status) => void
+}) {
+  const glitch = useRef<Mesh>(null)
   const orbit = useRef<Group>(null)
   const craft = useRef<Group>(null)
   const beam = useRef<Mesh>(null)
@@ -67,6 +81,7 @@ function Craft({ design, look, month, onStatus }: { design: MissionDesign; look:
     const boost = t < boostUntil.current ? 12 : 1
     if (station.current) station.current.rotation.y += delta * 0.15 // turns with Earth
 
+    if (glitch.current) glitch.current.visible = effect === 'instrument-glitch' && Math.sin(t * 10) > 0
     if (!craft.current) return
     if (look.away) {
       // Parked far away (L1 towards the Sun, deep space drifting off), with a small halo loop
@@ -97,8 +112,8 @@ function Craft({ design, look, month, onStatus }: { design: MissionDesign; look:
       station.current.children[0].getWorldPosition(stationWorld)
       const toCraft = world.clone().sub(stationWorld)
       const up = stationWorld.clone().normalize()
-      sending = toCraft.clone().normalize().dot(up) > (look.radius > 4 ? 0.2 : 0.55)
-      beam.current.visible = sending
+      sending = effect !== 'station-outage' && toCraft.clone().normalize().dot(up) > (look.radius > 4 ? 0.2 : 0.55)
+      beam.current.visible = sending && effect !== 'station-outage'
       if (sending) {
         const mid = stationWorld.clone().add(world).multiplyScalar(0.5)
         beam.current.position.copy(mid)
@@ -126,8 +141,16 @@ function Craft({ design, look, month, onStatus }: { design: MissionDesign; look:
       <group ref={station} rotation={[0.35, 0, 0.1]}>
         <mesh position={[0, 0.35, EARTH_R * 0.97]}>
           <sphereGeometry args={[0.06, 12, 12]} />
-          <meshBasicMaterial color="#22d3ee" toneMapped={false} />
+          <meshBasicMaterial color={effect === 'station-outage' ? '#f43f5e' : '#22d3ee'} toneMapped={false} />
         </mesh>
+        {/* Fire season: glowing fires around the station's region (Southeast Asia) */}
+        {effect === 'fire-season' &&
+          FIRES.map(([x, y], i) => (
+            <mesh key={i} position={new Vector3(x, 0.35 + y, EARTH_R).normalize().multiplyScalar(EARTH_R * 1.005).toArray()}>
+              <sphereGeometry args={[0.035, 8, 8]} />
+              <meshBasicMaterial color="#fb923c" toneMapped={false} />
+            </mesh>
+          ))}
       </group>
       <mesh ref={beam} visible={false}>
         <cylinderGeometry args={[0.015, 0.015, 1, 6]} />
@@ -135,12 +158,107 @@ function Craft({ design, look, month, onStatus }: { design: MissionDesign; look:
       </mesh>
       <group ref={orbit} rotation={[look.tilt[0], 0, look.tilt[1]]}>
         {!look.away && <Line points={path} color="#67e8f9" lineWidth={1} transparent opacity={0.35} />}
-        <group ref={craft} scale={look.radius > 4 ? 0.5 : 0.34}>
+        <group ref={craft} scale={look.radius > 4 ? 0.6 : 0.45}>
           <CraftModel design={design} instant />
+          <mesh ref={glitch} visible={false} position={[0, 0.9, 0]}>
+            <sphereGeometry args={[0.18, 12, 12]} />
+            <meshBasicMaterial color="#f43f5e" toneMapped={false} />
+          </mesh>
         </group>
       </group>
     </>
   )
+}
+
+/** Fire spots near the station, as small offsets on Earth's face */
+const FIRES: [number, number][] = [
+  [0.12, 0.08], [-0.1, 0.15], [0.2, -0.05], [-0.18, -0.02], [0.05, 0.22], [0.25, 0.14], [-0.05, -0.12],
+]
+
+const STORM_COUNT = 260
+/** Fixed pseudo-random offsets for the storm particles */
+const STORM_SEEDS = Array.from({ length: STORM_COUNT }, (_, i) => [
+  ((i * 7919) % 1000) / 1000,
+  ((i * 104729) % 1000) / 1000 - 0.5,
+  ((i * 1299709) % 1000) / 1000 - 0.5,
+])
+
+/** A solar storm: particles streaming from the Sun past Earth */
+function StormStream() {
+  const ref = useRef<Points>(null)
+  const side = useMemo(() => new Vector3(0, 1, 0).cross(SUN_DIR).normalize(), [])
+  const up = useMemo(() => SUN_DIR.clone().cross(side).normalize(), [side])
+  useFrame(({ clock }) => {
+    const geo = ref.current?.geometry
+    if (!geo) return
+    if (!geo.getAttribute('position')) geo.setAttribute('position', new BufferAttribute(new Float32Array(STORM_COUNT * 3), 3))
+    const attr = geo.getAttribute('position') as BufferAttribute
+    const positions = attr.array as Float32Array
+    const t = clock.elapsedTime
+    const p = new Vector3()
+    for (let i = 0; i < STORM_COUNT; i++) {
+      const [phase, a, b] = STORM_SEEDS[i]
+      const k = (phase + t * 0.35) % 1 // 0 at the Sun side, 1 past Earth
+      const spread = 1.2 + k * 2.2
+      p.copy(SUN_DIR).multiplyScalar(14 - k * 22).addScaledVector(side, a * spread * 2).addScaledVector(up, b * spread * 2)
+      positions[i * 3] = p.x
+      positions[i * 3 + 1] = p.y
+      positions[i * 3 + 2] = p.z
+    }
+    attr.needsUpdate = true
+  })
+  return (
+    <points ref={ref}>
+      <bufferGeometry />
+      <pointsMaterial color="#fb923c" size={0.08} transparent opacity={0.85} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+    </points>
+  )
+}
+
+/** Space debris: a few tumbling bits crossing the orbit */
+function Debris({ radius }: { radius: number }) {
+  const ref = useRef<Group>(null)
+  useFrame((_, delta) => {
+    if (!ref.current) return
+    ref.current.rotation.y -= delta * 0.5
+    ref.current.children.forEach((c, i) => {
+      c.rotation.x += delta * (1 + i * 0.3)
+      c.rotation.z += delta * 0.7
+    })
+  })
+  return (
+    <group ref={ref} rotation={[0.4, 0, -0.3]}>
+      {Array.from({ length: 9 }, (_, i) => {
+        const a = (i / 9) * Math.PI * 0.9
+        return (
+          <mesh key={i} position={[Math.cos(a) * (radius + (i % 3) * 0.08), (i % 2) * 0.1 - 0.05, Math.sin(a) * radius]}>
+            <dodecahedronGeometry args={[0.05 + (i % 3) * 0.02, 0]} />
+            <meshStandardMaterial color="#9ca3af" roughness={0.9} />
+          </mesh>
+        )
+      })}
+    </group>
+  )
+}
+
+/** Keeps Earth and the whole orbit in view on tall phones and wide screens */
+function CameraRig({ look }: { look: OrbitLook }) {
+  const { camera, size } = useThree()
+  useFrame(() => {
+    const cam = camera as PerspectiveCamera
+    const aspect = size.width / Math.max(1, size.height)
+    const halfV = (cam.fov * Math.PI) / 360
+    const halfH = Math.atan(Math.tan(halfV) * aspect)
+    const reach = look.away ? look.radius * 0.75 + EARTH_R : look.radius + 0.4
+    // Far enough that the orbit fits across, and fills about half the screen height
+    const dist = Math.max(reach / Math.tan(halfH), (reach * 2.3) / Math.tan(halfV))
+    const base = new Vector3(...look.camera).normalize()
+    // Aim a little below Earth so it sits above the bottom panel
+    const target = new Vector3(look.away ? 1.5 : 0, -reach * 0.25, 0)
+    cam.position.lerp(target.clone().addScaledVector(base, dist), 0.08)
+    cam.lookAt(target)
+  })
+  return null
 }
 
 export interface Status {
@@ -152,12 +270,15 @@ export default function OrbitScene({
   design,
   orbitId,
   month,
+  effect = null,
   onStatus,
 }: {
   design: MissionDesign
   orbitId: OrbitId
   /** Months flown so far: a change plays a short fast-forward */
   month: number
+  /** The surprise happening now, shown in 3D */
+  effect?: EventId | null
   onStatus: (s: Status) => void
 }) {
   const wrapper = useRef<HTMLDivElement>(null)
@@ -173,15 +294,17 @@ export default function OrbitScene({
           frameloop={visible ? 'always' : 'never'}
           camera={{ position: look.camera, fov: 40 }}
           gl={{ antialias: true, powerPreference: 'high-performance' }}
-          onCreated={({ camera }) => camera.lookAt(look.away ? 1.5 : 0, 0, 0)}
         >
+          <CameraRig look={look} />
           <color attach="background" args={['#010208']} />
           <ambientLight intensity={0.15} />
           <directionalLight position={[sun.x, sun.y, sun.z]} intensity={3} color="#fff4dc" />
           <Stars radius={60} depth={30} count={1500} factor={3} saturation={0.5} fade speed={0.4} />
-          <Sun position={[sun.x, sun.y, sun.z]} size={5} />
+          <Sun position={[sun.x, sun.y, sun.z]} size={effect === 'solar-storm' ? 9 : 5} />
+          {effect === 'solar-storm' && <StormStream />}
+          {effect === 'debris' && !look.away && <Debris radius={look.radius} />}
           <Earth radius={EARTH_R} position={[0, 0, 0]} spin={0.15} sunDirection={SUN_DIR} />
-          <Craft design={design} look={look} month={month} onStatus={onStatus} />
+          <Craft design={design} look={look} month={month} effect={effect} onStatus={onStatus} />
         </Canvas>
       </ErrorBoundary>
     </div>

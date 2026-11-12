@@ -271,6 +271,7 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
             />
           }
           banner={<RoleCard role={room.my_role} isHost={isHost} state={opState} craft={craft} />}
+          alert={m.error || !m.connected ? banners : undefined}
           flyControl={
             isHost ? (
               <button
