@@ -18,7 +18,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { buildFlight } from '../../../game/engine/evaluate'
 import { rollLaunch, withLaunchDefaults } from '../../../game/engine/launch'
-import { summarize, type FlightSpacecraft, type OperateState } from '../../../game/events/operate'
+import { EVENTS } from '../../../game/events/events'
+import { summarize, type FlightSpacecraft, type MissionFocus, type OperateState } from '../../../game/events/operate'
 import { nextRandom } from '../../../game/events/random'
 import { scoreMission } from '../../../game/scoring/score'
 import type { MissionDesign, Role } from '../../../game/types'
@@ -72,7 +73,7 @@ type Act = (fn: () => Promise<unknown>) => Promise<void>
  * /mission/team/:code, the same mission on every phone in the crew (up to 4):
  * Lobby (roles) → Design together (each role builds its part, live)
  * → vote to go to the pad → Launch together (everyone taps Launch, everyone sees the same launch)
- * → Fly month by month (mission control handles surprises) → Report + leaderboard → redesign.
+ * → Fly month by month (the crew votes on each surprise) → Report + leaderboard → redesign.
  * A live crew chat floats over every screen.
  */
 export default function TeamRoom() {
@@ -131,6 +132,11 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
     const score = scoreMission(summarize(craft, opState), { team: room.crew.length > 1 })
     submitMissionResult(room.room_id, `${host?.nickname ?? 'Team'}'s crew`, score).catch((e) => m.setError(errorText(e)))
   }, [room, craft, opState, isHost, ops?.attempt, m, host])
+
+  // The Flight Director picks each month's plan; it travels with the Fly move.
+  // Until they pick, it stays what the crew flew last month.
+  const [planPick, setPlanFocus] = useState<MissionFocus | null>(null)
+  const planFocus: MissionFocus = planPick ?? opState?.focus ?? 'steady'
 
   const act: Act = async (fn) => {
     m.setError(null)
@@ -227,19 +233,34 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
       ) : room.phase === 'operate' && craft && opState ? (
         <OperateView
           craft={craft}
-          state={opState}
+          design={flying}
           canToggle={canToggle}
           toggleNote={
             canToggle ? undefined : `Only the Science Lead (${scienceHolder?.nickname ?? 'the host'}) can switch instruments.`
           }
           onToggle={(id, on) => act(() => addMissionOp(room.room_id, 'toggle', { instrumentId: id, on }))}
           onFly={() => {}}
+          onChoose={() => {}}
+          onFocus={setPlanFocus}
+          canFocus={isHost}
+          state={isHost ? { ...opState, focus: planFocus } : opState}
+          eventControl={
+            <EventVote
+              m={m}
+              room={room}
+              userId={userId}
+              isHost={isHost}
+              state={opState}
+              act={act}
+            />
+          }
           banner={<RoleCard role={room.my_role} isHost={isHost} state={opState} craft={craft} />}
+          alert={m.error || !m.connected ? banners : undefined}
           flyControl={
             isHost ? (
               <button
                 type="button"
-                onClick={() => act(() => addMissionOp(room.room_id, 'fly', { month: opState.month + 1 }))}
+                onClick={() => act(() => addMissionOp(room.room_id, 'fly', { month: opState.month + 1, focus: planFocus }))}
                 className={`glow-violet min-h-14 bg-violet-500 px-10 text-lg hover:bg-violet-400 ${button}`}
               >
                 Fly month {opState.month + 1} →
@@ -660,5 +681,116 @@ function TeamLeaderboard({ scenarioId, attempt }: { scenarioId: string; attempt:
       </div>
       <LeaderboardTable scenarioId={scenarioId} limit={5} refreshKey={attempt} compact />
     </section>
+  )
+}
+
+/**
+ * A surprise in flight, team version: anyone proposes one of the two choices,
+ * the crew votes, and when more than half agree the server records it as the choice.
+ * The Flight Director can also decide at once (e.g. if someone has gone quiet).
+ */
+function EventVote({
+  m,
+  room,
+  userId,
+  isHost,
+  state,
+  act,
+}: {
+  m: MissionRoom
+  room: MissionState
+  userId: string | null
+  isHost: boolean
+  state: OperateState
+  act: Act
+}) {
+  const event = state.pending ? EVENTS[state.pending.id] : null
+  const month = state.month + 1
+  const vote = m.vote && m.vote.topic === 'event' && Number(m.vote.proposal.month) === month ? m.vote : null
+  const lastFailed =
+    !vote && m.closedVote?.topic === 'event' && m.closedVote.status === 'failed' && Number(m.closedVote.proposal.month) === month
+      ? m.closedVote
+      : null
+  if (!event) return null
+
+  const alone = room.crew.length <= 1
+  const decide = (i: number) => act(() => addMissionOp(room.room_id, 'choice', { month, choice: i }))
+  // A passed 'event' vote becomes the crew's choice on the server (settle_vote),
+  // so it works even when live updates are blocked and phones poll instead
+  const propose = (i: number) => act(() => proposeVote(room.room_id, 'event', { month, choice: i }))
+  const ballot = (yes: boolean) => act(async () => (vote ? castBallot(vote.vote_id, yes) : undefined))
+
+  if (vote) {
+    const choice = event.choices[Number(vote.proposal.choice)]
+    const proposer = room.crew.find((c) => c.user_id === vote.proposed_by)
+    const iVoted = userId ? vote.voted.includes(userId) : false
+    return (
+      <div role="status" className="mt-4 rounded-2xl border border-cyan-300/40 bg-cyan-300/5 p-4">
+        <p className="font-semibold">
+          {proposer?.user_id === userId ? 'You want' : `${proposer?.nickname ?? 'Someone'} wants`} to “{choice?.label}”
+        </p>
+        <p className="mt-1 text-sm text-slate-300">{choice?.hint}</p>
+        <p className="mt-2 flex items-center gap-3 text-sm tabular-nums text-slate-300">
+          <span className="flex items-center gap-1">
+            <ThumbsUp aria-hidden="true" className="size-4 text-emerald-300" /> {vote.yes}
+          </span>
+          <span className="flex items-center gap-1">
+            <ThumbsDown aria-hidden="true" className="size-4 text-rose-300" /> {vote.no}
+          </span>
+          <span className="text-slate-400">of {vote.crew_size}. More than half must agree.</span>
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {iVoted ? (
+            <span className="text-sm text-slate-400">You voted. Waiting for the others…</span>
+          ) : (
+            <>
+              <button type="button" onClick={() => ballot(true)} className={`bg-emerald-500 text-space-950 hover:bg-emerald-400 ${button}`}>
+                Agree
+              </button>
+              <button type="button" onClick={() => ballot(false)} className={`bg-white/10 hover:bg-white/20 ${button}`}>
+                Disagree
+              </button>
+            </>
+          )}
+          {isHost && (
+            <button
+              type="button"
+              onClick={() => decide(Number(vote.proposal.choice))}
+              className="ml-auto min-h-11 text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
+            >
+              Decide now
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <p className="mt-4 text-sm text-slate-300">
+        {alone
+          ? 'Pick what to do.'
+          : 'Talk it over in the chat, then put one choice to the crew vote. Anyone can propose.'}
+      </p>
+      {lastFailed && (
+        <p className="mt-2 rounded-xl bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
+          The crew said no to “{event.choices[Number(lastFailed.proposal.choice)]?.label}”. Try the other choice, or talk it over.
+        </p>
+      )}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {event.choices.map((c, i) => (
+          <button
+            key={c.label}
+            type="button"
+            onClick={() => (alone ? decide(i) : propose(i))}
+            className="min-h-14 rounded-2xl border border-white/15 bg-white/5 p-4 text-left transition hover:border-cyan-300/60 hover:bg-white/10 active:scale-[0.98]"
+          >
+            <span className="block font-semibold">{alone ? c.label : `Propose: ${c.label}`}</span>
+            <span className="mt-1 block text-sm text-slate-300">{c.hint}</span>
+          </button>
+        ))}
+      </div>
+    </>
   )
 }

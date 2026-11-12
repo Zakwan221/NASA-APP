@@ -21,6 +21,7 @@ export default function SoloFlight() {
   return (
     <OperatePage
       craft={craft}
+      design={design}
       reportFooter={
         <div className="card mt-6 p-5 text-center">
           <p className="font-semibold">Want to fix what went wrong?</p>
