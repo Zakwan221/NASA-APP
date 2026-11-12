@@ -10,6 +10,7 @@ import {
   type OperateState,
 } from '../../../game/events/operate'
 import { newSeed } from '../../../game/events/random'
+import NasaPanel from '../nasa/NasaPanel'
 import ReportScreen from '../report/ReportScreen'
 import { MissionLog, Stat } from './parts'
 import { PLACEHOLDER_CRAFT } from './placeholderCraft'
@@ -104,6 +105,10 @@ export function OperateView({
           </span>
         </div>
       </header>
+
+      <div className="mb-6">
+        <NasaPanel scenarioId={craft.scenario.id} compact />
+      </div>
 
       {banner}
 

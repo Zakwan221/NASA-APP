@@ -63,7 +63,7 @@ export function summarizeFires(raw: { events?: EonetEvent[] }): FiresSummary {
     if (!g || g.type !== 'Point') continue
     const [lon, lat] = g.coordinates as number[]
     fires.push({
-      title: e.title.replace(/^Wildfire\s+/i, ''),
+      title: e.title,
       date: g.date,
       lat,
       lon,

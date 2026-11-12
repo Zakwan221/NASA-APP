@@ -1,8 +1,18 @@
 /**
  * Shared NASA Open API helpers.
- * Used by the Home and Info pages — keep this file framework-free.
+ * Used by the Home page and the mission game — keep this file framework-free.
  * Every function returns `null` on failure so pages never crash.
  */
+
+import {
+  donkiCmeUrl,
+  EONET_FIRES_URL,
+  neoFeedUrl,
+  pickAsteroid,
+  summarizeFires,
+  summarizeStorms,
+  type MissionNasaData,
+} from './nasaMission'
 
 const API_KEY = import.meta.env.VITE_NASA_KEY || 'DEMO_KEY'
 const BASE_URL = 'https://api.nasa.gov'
@@ -199,4 +209,46 @@ export async function getTodayAsteroids(): Promise<AsteroidSummary | null> {
   }
   writeCache(cacheKey, summary)
   return summary
+}
+
+/* ---------------- Mission data (EONET, DONKI, NeoWs) ---------------- */
+
+/** Fetch a full URL with a time limit; null on any failure */
+async function fetchUrl<T>(url: string, timeoutMs = 9000): Promise<T | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+    if (!res.ok) return null
+    return (await res.json()) as T
+  } catch {
+    return null
+  }
+}
+
+const daysAgoISO = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
+
+/**
+ * Today's real NASA data for the three missions, live from NASA (cached for an
+ * hour). A part NASA didn't answer is null: the game then uses its saved copy.
+ */
+export async function getMissionNasa(): Promise<MissionNasaData> {
+  const cacheKey = `orbitly:mission-nasa:${todayISO()}`
+  const cached = readCache<MissionNasaData>(cacheKey)
+  if (cached) return cached
+
+  const from = daysAgoISO(30)
+  const to = new Date().toISOString().slice(0, 10)
+  const [fires, cmes, neo] = await Promise.all([
+    fetchUrl<Parameters<typeof summarizeFires>[0]>(EONET_FIRES_URL),
+    fetchUrl<Parameters<typeof summarizeStorms>[0]>(donkiCmeUrl(API_KEY, from, to)),
+    fetchUrl<Parameters<typeof pickAsteroid>[0]>(neoFeedUrl(API_KEY, to)),
+  ])
+  const data: MissionNasaData = {
+    fetchedAt: new Date().toISOString(),
+    fires: fires ? summarizeFires(fires) : null,
+    storms: Array.isArray(cmes) ? summarizeStorms(cmes, from, to) : null,
+    asteroid: neo ? pickAsteroid(neo) : null,
+  }
+  // Only cache a complete answer, so a NASA hiccup is retried next time
+  if (data.fires && data.storms && data.asteroid) writeCache(cacheKey, data)
+  return data
 }

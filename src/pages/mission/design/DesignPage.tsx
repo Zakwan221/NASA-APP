@@ -8,6 +8,7 @@ import type { Difficulty, ResourceKey } from '../../../game/types'
 import { useMission } from '../../../store/missionStore'
 import Builder from './Builder'
 import { BUILD_STEPS, stepDone } from './buildSteps'
+import NasaPanel from '../nasa/NasaPanel'
 import PhaseSteps from './components/PhaseSteps'
 import { useDesignEditor } from './editor'
 
@@ -163,6 +164,12 @@ export default function DesignPage({
           })}
         </div>
       </section>
+
+      {scenarioId && (
+        <div className="mt-4">
+          <NasaPanel scenarioId={scenarioId} />
+        </div>
+      )}
 
       <section className="mt-10" aria-labelledby="mode-h">
         <h2 id="mode-h" className="text-xl font-bold">
