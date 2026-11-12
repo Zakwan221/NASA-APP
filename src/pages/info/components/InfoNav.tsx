@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { BookOpen, Boxes, Trophy } from 'lucide-react'
+import { BookOpen, Boxes, Library, Trophy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
@@ -7,10 +7,11 @@ const TABS = [
   { to: '/info', end: true, label: 'How to play', icon: BookOpen },
   { to: '/info/items', end: false, label: 'Items', icon: Boxes },
   { to: '/info/tips', end: false, label: 'Tips to win', icon: Trophy },
+  { to: '/info/sources', end: false, label: 'Sources', icon: Library },
 ]
 
 /**
- * The three Info pages as a liquid-glass tab bar under the main menu.
+ * The Info pages as a liquid-glass tab bar under the main menu.
  * Once the page scrolls, a frosted band joins it to the menu, so nothing shows around it.
  * Pages leave room for it at the top (pt-40), so it never covers content at rest.
  */
@@ -43,7 +44,7 @@ export default function InfoNav() {
               to={t.to}
               end={t.end}
               className={({ isActive }) =>
-                `relative flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition-colors sm:px-4 ${
+                `relative flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-sm font-semibold transition-colors sm:px-4 ${
                   isActive ? 'text-space-950' : 'text-slate-200 hover:text-white'
                 }`
               }
@@ -61,7 +62,8 @@ export default function InfoNav() {
                       }}
                     />
                   )}
-                  <t.icon aria-hidden="true" className="relative size-4" />
+                  {/* Icons hide on small phones so the four tabs fit on one line */}
+                  <t.icon aria-hidden="true" className="relative hidden size-4 sm:block" />
                   <span className="relative">{t.label}</span>
                 </>
               )}
