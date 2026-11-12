@@ -37,7 +37,6 @@ import {
   submitMissionResult,
   type CrewMember,
   type MissionState,
-  type VotePayload,
 } from '../../../multiplayer/missionApi'
 import { replayOps } from '../../../multiplayer/replay'
 import { errorText, useMissionRoom, type MissionRoom } from '../../../multiplayer/useMissionRoom'
@@ -134,24 +133,10 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
     submitMissionResult(room.room_id, `${host?.nickname ?? 'Team'}'s crew`, score).catch((e) => m.setError(errorText(e)))
   }, [room, craft, opState, isHost, ops?.attempt, m, host])
 
-  // The Flight Director picks each month's plan; it travels with the Fly move
-  const [planFocus, setPlanFocus] = useState<MissionFocus>('steady')
-
-  // A surprise vote passed: the host's phone records the crew's choice (once)
-  const sentChoice = useRef<string | null>(null)
-  const sendChoice = (v: VotePayload) => {
-    const month = Number(v.proposal.month)
-    const choice = Number(v.proposal.choice)
-    if (!isHost || !opState?.pending || month !== opState.month + 1 || !Number.isInteger(choice)) return
-    if (sentChoice.current === v.vote_id) return
-    sentChoice.current = v.vote_id
-    addMissionOp(room.room_id, 'choice', { month, choice })
-      .then(() => m.reload())
-      .catch((e) => m.setError(errorText(e)))
-  }
-  useEffect(() => {
-    if (m.closedVote?.topic === 'event' && m.closedVote.status === 'passed') sendChoice(m.closedVote)
-  })
+  // The Flight Director picks each month's plan; it travels with the Fly move.
+  // Until they pick, it stays what the crew flew last month.
+  const [planPick, setPlanFocus] = useState<MissionFocus | null>(null)
+  const planFocus: MissionFocus = planPick ?? opState?.focus ?? 'steady'
 
   const act: Act = async (fn) => {
     m.setError(null)
@@ -267,7 +252,6 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
               isHost={isHost}
               state={opState}
               act={act}
-              onPassed={sendChoice}
             />
           }
           banner={<RoleCard role={room.my_role} isHost={isHost} state={opState} craft={craft} />}
@@ -702,7 +686,7 @@ function TeamLeaderboard({ scenarioId, attempt }: { scenarioId: string; attempt:
 
 /**
  * A surprise in flight, team version: anyone proposes one of the two choices,
- * the crew votes, and when more than half agree the host's phone records it.
+ * the crew votes, and when more than half agree the server records it as the choice.
  * The Flight Director can also decide at once (e.g. if someone has gone quiet).
  */
 function EventVote({
@@ -712,7 +696,6 @@ function EventVote({
   isHost,
   state,
   act,
-  onPassed,
 }: {
   m: MissionRoom
   room: MissionState
@@ -720,7 +703,6 @@ function EventVote({
   isHost: boolean
   state: OperateState
   act: Act
-  onPassed: (v: VotePayload) => void
 }) {
   const event = state.pending ? EVENTS[state.pending.id] : null
   const month = state.month + 1
@@ -733,17 +715,10 @@ function EventVote({
 
   const alone = room.crew.length <= 1
   const decide = (i: number) => act(() => addMissionOp(room.room_id, 'choice', { month, choice: i }))
-  const propose = (i: number) =>
-    act(async () => {
-      const v = await proposeVote(room.room_id, 'event', { month, choice: i })
-      if (v.status === 'passed') onPassed(v)
-    })
-  const ballot = (yes: boolean) =>
-    act(async () => {
-      if (!vote) return
-      const v = await castBallot(vote.vote_id, yes)
-      if (v.status === 'passed') onPassed(v)
-    })
+  // A passed 'event' vote becomes the crew's choice on the server (settle_vote),
+  // so it works even when live updates are blocked and phones poll instead
+  const propose = (i: number) => act(() => proposeVote(room.room_id, 'event', { month, choice: i }))
+  const ballot = (yes: boolean) => act(async () => (vote ? castBallot(vote.vote_id, yes) : undefined))
 
   if (vote) {
     const choice = event.choices[Number(vote.proposal.choice)]
