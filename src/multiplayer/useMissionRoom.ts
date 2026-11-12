@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ensureSignedIn } from '../lib/supabase'
 import {
   connectToMission,
+  getChat,
   getMissionOps,
+  type ChatMessage,
   getMissionState,
   type MissionOps,
   type MissionState,
@@ -16,6 +18,8 @@ export interface MissionRoom {
   /** The open vote, kept live from broadcasts */
   vote: VotePayload | null
   online: string[]
+  /** Crew chat, oldest first */
+  chat: ChatMessage[]
   connected: boolean
   error: string | null
   setError: (e: string | null) => void
@@ -33,6 +37,7 @@ export function useMissionRoom(code: string): MissionRoom {
   const [ops, setOps] = useState<MissionOps | null>(null)
   const [vote, setVote] = useState<VotePayload | null>(null)
   const [online, setOnline] = useState<string[]>([])
+  const [chat, setChat] = useState<ChatMessage[]>([])
   const [connected, setConnected] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const roomId = useRef<string | null>(null)
@@ -40,12 +45,13 @@ export function useMissionRoom(code: string): MissionRoom {
   const reload = useCallback(async () => {
     try {
       const state = await getMissionState(code)
-      const moves = await getMissionOps(state.room_id)
+      const [moves, messages] = await Promise.all([getMissionOps(state.room_id), getChat(state.room_id)])
       // set together, so a screen never sees the new phase with the old moves
       roomId.current = state.room_id
       setRoom(state)
       setVote(state.open_vote)
       setOps(moves)
+      setChat(messages)
     } catch (e) {
       setError(errorText(e))
     }
@@ -68,6 +74,9 @@ export function useMissionRoom(code: string): MissionRoom {
           onDesign: () => void reload(),
           onPhase: () => void reload(),
           onResult: () => void reload(),
+          onLaunch: () => void reload(),
+          onLaunchReady: (ready) => setRoom((r) => (r ? { ...r, launch_ready: ready } : r)),
+          onChat: (msg) => setChat((cur) => (cur.some((c) => c.id === msg.id) ? cur : [...cur, msg].slice(-50))),
           onVote: (v) => setVote(v.status === 'open' ? v : null),
           onOp: (op) =>
             setOps((cur) =>
@@ -93,5 +102,5 @@ export function useMissionRoom(code: string): MissionRoom {
     return () => clearInterval(timer)
   }, [connected, reload])
 
-  return { userId, room, ops, vote, online, connected, error, setError, reload }
+  return { userId, room, ops, vote, online, chat, connected, error, setError, reload }
 }

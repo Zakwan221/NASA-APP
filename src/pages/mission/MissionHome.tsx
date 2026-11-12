@@ -1,28 +1,29 @@
+import { Satellite, Smartphone, Trophy, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Shell } from './operate/OperatePage'
 
 const OPTIONS = [
   {
-    to: '/mission/operate',
-    icon: '🧑‍🚀',
+    to: '/mission/design',
+    icon: UserRound,
     title: 'Fly solo',
-    text: 'Run the whole mission yourself, on this device.',
+    text: 'Design, launch and fly the whole mission yourself, on this device.',
   },
   {
     to: '/mission/team/host',
-    icon: '🛰️',
+    icon: Satellite,
     title: 'Host a team mission',
-    text: 'Open a room for up to 4 people. Each takes a role and you vote on big decisions.',
+    text: 'Up to 4 people build one spacecraft together, live. Each role designs its part, then you launch and fly it as a crew.',
   },
   {
     to: '/mission/team/join',
-    icon: '📱',
+    icon: Smartphone,
     title: 'Join a team',
     text: 'Enter the 6-digit code on the host’s screen.',
   },
   {
     to: '/mission/leaderboard',
-    icon: '🏆',
+    icon: Trophy,
     title: 'Leaderboard',
     text: 'See the best missions so far, and why they scored what they did.',
   },
@@ -44,8 +45,8 @@ export default function MissionHome() {
               to={o.to}
               className="card flex min-h-20 items-center gap-4 p-5 transition hover:border-white/25 active:scale-[0.98]"
             >
-              <span className="text-3xl" aria-hidden="true">
-                {o.icon}
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-cyan-300/10" aria-hidden="true">
+                <o.icon className="size-6 text-cyan-300" strokeWidth={1.75} />
               </span>
               <span>
                 <span className="block text-lg font-semibold">{o.title}</span>

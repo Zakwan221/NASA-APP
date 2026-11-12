@@ -2,8 +2,9 @@
  * Random events in the Operate phase. Each one is a small decision for the team
  * (a good fit for a team vote), and every outcome explains why it happened.
  *
- * Solar storms will later use real CMEs from NASA DONKI (Ibad's snapshot in
- * src/game/data/), and the wildfire event real fires from NASA EONET.
+ * The flight log adds a real NASA example to solar storms (DONKI) and wildfires
+ * (EONET): see src/pages/mission/nasa/. The events themselves stay random and
+ * seeded, so every phone in a team room sees the same mission.
  */
 
 import type { FlightSpacecraft, LogEntry, OperateState, PendingEvent } from './operate'

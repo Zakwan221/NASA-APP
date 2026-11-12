@@ -42,6 +42,8 @@ export interface Part extends CatalogItem {
   capacityWh?: number
   /** Downlink speed (kbps). Only radios. */
   dataRateKbps?: number
+  /** Furthest distance from Earth this radio can still be heard (km). Only radios. */
+  maxRangeKm?: number
   /** Onboard storage (Mbit). Only computers. */
   storageMbit?: number
   /** Pointing accuracy (degrees). Only attitude control. */
@@ -89,6 +91,8 @@ export interface LaunchVehicle {
   capacityKg: Partial<Record<OrbitId, number>>
   /** 0..1 chance of a launch-day problem (used by random events) */
   riskOfIssue: number
+  /** 0..1 chance the rocket fails and the spacecraft is lost. Reliability = 1 − failureRate */
+  failureRate: number
   explain: string
   source: string
 }
@@ -164,6 +168,8 @@ export interface Warning {
   /** One sentence that says WHY, e.g. "Camera needs 40 W but panels give 25 W in shadow." */
   message: string
   blocking: boolean
+  /** Which screen can fix it: Design (parts, instruments) or Launch (orbit, rocket) */
+  phase: 'design' | 'launch'
 }
 
 export interface ScoreBreakdown {

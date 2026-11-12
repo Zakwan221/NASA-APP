@@ -1,0 +1,61 @@
+{
+  "fetchedAt": "2026-11-12T05:51:55.079Z",
+  "fires": {
+    "total": 112,
+    "nearMalaysia": 71,
+    "nearest": [
+      {
+        "title": "Wildfire in Indonesia 1032487",
+        "date": "2026-09-14T19:00:00Z",
+        "lat": -1.1860830314843,
+        "lon": 104.24645426704,
+        "distanceKm": 559,
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_24961"
+      },
+      {
+        "title": "Wildfire in Indonesia 1032648",
+        "date": "2026-09-27T19:00:00Z",
+        "lat": -1.3500397154154,
+        "lon": 104.09826473943,
+        "distanceKm": 567,
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_25148"
+      },
+      {
+        "title": "Wildfire in Indonesia 1032797",
+        "date": "2026-10-02T19:00:00Z",
+        "lat": -1.4988234841453,
+        "lon": 104.40421371006,
+        "distanceKm": 598,
+        "link": "https://eonet.gsfc.nasa.gov/api/v3/events/EONET_25307"
+      }
+    ],
+    "newestDate": "2026-10-28T19:00:00Z"
+  },
+  "storms": {
+    "from": "2026-10-13",
+    "to": "2026-11-12",
+    "total": 82,
+    "latest": {
+      "id": "2026-11-11T23:24:00-CME-001",
+      "time": "2026-11-11T23:24Z",
+      "speedKms": 367,
+      "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/CME/49505/-1"
+    },
+    "fastest": {
+      "id": "2026-10-17T02:48:00-CME-001",
+      "time": "2026-10-17T02:48Z",
+      "speedKms": 1048,
+      "link": "https://ccmc.gsfc.nasa.gov/DONKI/view/CME/49150/-1"
+    }
+  },
+  "asteroid": {
+    "name": "2017 VK1",
+    "date": "2026-11-12",
+    "diameterMeters": 326,
+    "missDistanceKm": 31036480,
+    "velocityKmh": 55409,
+    "hazardous": false,
+    "link": "https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=3789097",
+    "passingToday": 4
+  }
+}

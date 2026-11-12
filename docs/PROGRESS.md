@@ -1,6 +1,6 @@
 # Orbitly progress: who has done what
 
-Last updated 7 Nov 2026. Plan and full split: [PLAN.md](PLAN.md). Hackathon: 14–15 Nov.
+Last updated 10 Nov 2026. Plan and full split: [PLAN.md](PLAN.md). Hackathon: 14–15 Nov.
 
 **Status in one line:** Adaam's part of the game (Operate, Report, team mode) works end to end with a placeholder spacecraft. It is waiting for Zakwan's Design and Launch screens and Ibad's real data, which are not started yet.
 
@@ -41,15 +41,22 @@ These were written so Adaam's screens could run. The owner can change or replace
 ### Done
 
 - Started the repo: Vite + React + TypeScript + Tailwind, layout, navbar, footer, Home page (Earth scene, APOD, asteroid stats, How it works), Games and Info page shells, NASA API helper, Vercel config.
+- Info page: NASA data tabs (DONKI, EONET, EPIC, images, asteroids).
+- **Engine** (`src/game/engine/`): `evaluate()` checks mass, power (sun and shadow, battery), budget (build + launch + operations), data, comms range and lifetime, and explains every problem in one sentence. `buildFlight()` hands the finished design to Operate. `rollLaunch()` for launch-day problems. 17 Vitest tests (`npm test`).
+- **Design** (`/mission/design`): mission, difficulty, lifetime, parts, instruments, live dashboard with expected science and "Why" warnings, "What is this?" on every card.
+- **Launch** (`/mission/launch`): orbit and rocket with a fit check, launch risk, countdown, launch report.
+- Solo flow now goes Design → Launch → Operate → Report → **Redesign** (`src/store/missionStore.ts`, saved in the browser).
 
 ### Still to do
 
-- Check and own `src/game/types.ts` and `src/game/scoring/score.ts`.
-- Engine: mass, power, budget, data, comms and lifetime checks, with warnings that say why (`src/game/engine/`), plus tests.
-- Design screen with a live resource dashboard (`src/pages/mission/design/`).
-- Launch screen: rocket and orbit fit check, launch-day risk (`src/pages/mission/launch/`).
-- Hand the designed spacecraft to Operate, and the Redesign loop from the Report.
-- Difficulty levels, Home text, Vercel deploy.
+- Team mode for Design and Launch (with Adaam): use `buildFlight()` instead of `PLACEHOLDER_CRAFT` in `team/`.
+- Check `score.ts` weights: a mission with 70% science still scores about 90.
+- Home text for the mission game, Vercel deploy.
+
+### Notes for the team
+
+- **Ibad:** `src/game/data/` has STARTER numbers so the game runs. Please check each against the NASA SmallSat report and fix the `source` text.
+- **Adaam:** `OperatePage` got one optional prop, `reportFooter` (for the Redesign button). `types.ts` got `Part.maxRangeKm` and `Warning.phase`.
 
 ## Ibad
 
