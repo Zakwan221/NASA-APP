@@ -248,6 +248,7 @@ function Room({ m, room, code }: { m: MissionRoom; room: MissionState; code: str
       ) : room.phase === 'operate' && craft && opState ? (
         <OperateView
           craft={craft}
+          design={flying}
           canToggle={canToggle}
           toggleNote={
             canToggle ? undefined : `Only the Science Lead (${scienceHolder?.nickname ?? 'the host'}) can switch instruments.`

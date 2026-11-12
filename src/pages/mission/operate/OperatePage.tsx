@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { EVENTS } from '../../../game/events/events'
 import {
   activeInstruments,
@@ -18,16 +18,23 @@ import { newSeed } from '../../../game/events/random'
 import NasaPanel from '../nasa/NasaPanel'
 import ReportScreen from '../report/ReportScreen'
 import { MissionLog, Stat } from './parts'
+import type { Status } from './OrbitScene'
 import { PLACEHOLDER_CRAFT } from './placeholderCraft'
+import type { MissionDesign } from '../../../game/types'
+
+const OrbitScene = lazy(() => import('./OrbitScene'))
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
 /** Phase 3, solo: fly the mission month by month in this browser. */
 export default function OperatePage({
   craft = PLACEHOLDER_CRAFT,
+  design,
   reportFooter,
 }: {
   craft?: FlightSpacecraft
+  /** The design, for drawing the spacecraft in orbit */
+  design?: MissionDesign
   /** Extra content on the Report screen, e.g. the Redesign button */
   reportFooter?: ReactNode
 }) {
@@ -55,6 +62,7 @@ export default function OperatePage({
         onFly={() => setState((s) => (s.pending ? s : runMonth(craft, s)))}
         onChoose={(i) => setState((s) => chooseEventOption(craft, s, i))}
         onFocus={(f) => setState((s) => setFocus(s, f))}
+        design={design}
       />
     </Shell>
   )
@@ -81,6 +89,8 @@ export interface OperateViewProps {
   flyControl?: ReactNode
   /** Extra panel under the header (e.g. your role and goal) */
   banner?: ReactNode
+  /** The design, for drawing the spacecraft in orbit (no 3D without it) */
+  design?: MissionDesign
 }
 
 /** The Operate screen without its state, so solo and team mode share it. */
@@ -97,6 +107,7 @@ export function OperateView({
   toggleNote,
   flyControl,
   banner,
+  design,
 }: OperateViewProps) {
   const storage = craft.parts.find((p) => p.category === 'computer')?.storageMbit ?? 0
   const solarW = craft.parts.find((p) => p.category === 'power')?.powerGenW ?? 0
@@ -127,6 +138,8 @@ export function OperateView({
           </span>
         </div>
       </header>
+
+      {design && <OrbitView design={design} craft={craft} month={state.month} />}
 
       <div className="mb-6">
         <NasaPanel scenarioId={craft.scenario.id} compact />
@@ -398,6 +411,30 @@ function FocusPicker({
         })}
       </div>
       {disabled && <p className="mt-3 text-sm text-slate-400">The Flight Director picks the plan.</p>}
+    </section>
+  )
+}
+
+/** The spacecraft in its orbit, with what it is doing right now */
+function OrbitView({ design, craft, month }: { design: MissionDesign; craft: FlightSpacecraft; month: number }) {
+  const [status, setStatus] = useState<Status>({ light: 'sun', sending: false })
+  const far = craft.orbit.shadowFraction === 0
+  return (
+    <section aria-label={`Your spacecraft in ${craft.orbit.name}`} className="card relative mb-6 h-56 overflow-hidden sm:h-72">
+      <Suspense fallback={<div className="h-full w-full animate-pulse bg-white/5" />}>
+        <OrbitScene design={design} orbitId={craft.orbit.id} month={month} onStatus={setStatus} />
+      </Suspense>
+      <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap gap-2 text-xs font-semibold">
+        <span
+          className={`rounded-full px-3 py-1 backdrop-blur ${status.light === 'shadow' ? 'bg-indigo-500/30 text-indigo-100' : 'bg-amber-300/20 text-amber-100'}`}
+        >
+          {status.light === 'shadow' ? 'In Earth’s shadow: running on battery' : far ? 'Always in sunlight' : 'In sunlight: charging'}
+        </span>
+        {status.sending && <span className="rounded-full bg-cyan-300/25 px-3 py-1 text-cyan-50 backdrop-blur">Over the ground station: sending data</span>}
+      </div>
+      <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/40 px-3 py-1 text-xs text-slate-200 backdrop-blur">
+        {craft.orbit.name}
+      </p>
     </section>
   )
 }
