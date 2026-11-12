@@ -34,12 +34,17 @@ describe('evaluate', () => {
     expect(blocking(GOOD)).toEqual([])
     const ev = evaluate(GOOD)
     expect(ev.launchReady).toBe(true)
-    expect(ev.massKg).toBeCloseTo(7.2, 1)
+    expect(ev.massKg).toBeCloseTo(6.5, 1)
     expect(ev.budgetLeftM).toBeGreaterThan(ev.opsReserveM)
   })
 
   it('blocks a spacecraft too heavy for its frame', () => {
-    const d = { ...GOOD, engineer: { ...GOOD.engineer, structureId: 'frame-3u' } }
+    // 3U carries at most 6 kg (CubeSat Design Specification); two cameras push it over
+    const d = {
+      ...GOOD,
+      engineer: { ...GOOD.engineer, structureId: 'frame-3u' },
+      science: { instrumentIds: ['camera', 'thermal-ir'] },
+    }
     expect(blocking(d).some((m) => m.includes('Too heavy'))).toBe(true)
   })
 

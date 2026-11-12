@@ -1,5 +1,5 @@
 /**
- * STARTER scenarios (Ibad owns this folder). Science targets are tuned so a
+ * Scenarios. Science targets are tuned so a
  * sensible design meets the objective and a great one gets full points.
  */
 

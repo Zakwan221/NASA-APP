@@ -1,6 +1,6 @@
 # Orbitly progress: who has done what
 
-Last updated 10 Nov 2026. Plan and full split: [PLAN.md](PLAN.md). Hackathon: 14–15 Nov.
+Last updated 12 Nov 2026. Plan and full split: [PLAN.md](PLAN.md). Hackathon: 14–15 Nov.
 
 **Status in one line:** Adaam's part of the game (Operate, Report, team mode) works end to end with a placeholder spacecraft. It is waiting for Zakwan's Design and Launch screens and Ibad's real data, which are not started yet.
 
@@ -55,22 +55,20 @@ These were written so Adaam's screens could run. The owner can change or replace
 
 ### Notes for the team
 
-- **Ibad:** `src/game/data/` has STARTER numbers so the game runs. Please check each against the NASA SmallSat report and fix the `source` text.
+- **Ibad:** `src/game/data/` numbers are now checked (see Ibad below).
 - **Adaam:** `OperatePage` got one optional prop, `reportFooter` (for the Redesign button). `types.ts` got `Part.maxRangeKm` and `Warning.phase`.
 
 ## Ibad
 
-### Done
+### Done (by Adaam with Claude, in Ibad's folders, 12 Nov)
 
-- Nothing in the repo yet.
+- `src/game/data/`: every number checked against NASA *State-of-the-Art of Small Spacecraft Technology* (2026), the CubeSat Design Specification Rev 14.1 and Rocket Lab Electron. Fixed: frame masses and how much each frame carries (3U 6 kg), solar panel masses, small rocket failure rate (4%). "STARTER" removed; each `source` names the table it comes from. Numbers NASA doesn't publish (prices, instruments) are labelled "Game estimate".
+- Sources page: `/info/sources` (`src/pages/info/sources/`), every NASA dataset, report and picture we use.
 
 ### Still to do
 
-- Data tables with sourced numbers in `src/game/data/`: parts, instruments, orbits, rockets (NASA *Small Spacecraft Technology State of the Art*).
-- Scenarios: Earth watch (Malaysia haze, EONET/EPIC) first, then Solar storm (DONKI/SDO). Saved JSON snapshots for offline demos.
-- "What is this?" text for every part, orbit and resource.
-- Learn page and Sources page (`src/pages/info/`).
 - 30-second video and slides.
+- Optional: a Solar storm scenario snapshot for offline demos.
 
 ## How to check what's new
 

@@ -1,5 +1,6 @@
 /**
- * STARTER orbits (Ibad owns this folder: check numbers and sources).
+ * Orbits. Heights and lifetimes are rounded typical values; shadow, contact time
+ * and coverage are game values.
  * `altitudeKm` is the distance from Earth, which is what the radio must reach.
  */
 

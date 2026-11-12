@@ -1,11 +1,13 @@
 /**
- * STARTER instruments (Ibad owns this folder: check numbers and sources).
- * Each scenario has a cheap simple option and a better advanced one.
+ * Instruments. Each scenario has a cheap simple option and a better advanced one.
+ * NASA's small-spacecraft report has no instrument chapter, so mass, power and
+ * data numbers are game estimates sized to fit 3U–12U CubeSats. Each `source`
+ * names the real NASA mission the instrument is modelled on, where there is one.
  */
 
 import type { Instrument } from '../types'
 
-const SOA = 'NASA Small Spacecraft Technology State of the Art (2024), ch. 7 Science Instruments'
+const SOA = 'Game estimate, sized for a CubeSat'
 
 export const INSTRUMENTS: Instrument[] = [
   /* ---------------- Earth watch: haze and wildfires ---------------- */
