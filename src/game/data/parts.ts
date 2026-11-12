@@ -1,15 +1,20 @@
 /**
- * STARTER catalog of spacecraft parts so the game runs end to end.
- * Ibad owns this folder: check every number against the NASA report and
- * replace the `source` text with the exact chapter and table.
- *
- * Values are typical for CubeSats and small satellites as described in
- * NASA's "Small Spacecraft Technology State of the Art" report (2024).
+ * Spacecraft parts. Numbers are rounded so players can do the maths, and sit
+ * inside the ranges NASA lists for CubeSats and small satellites (checked 12 Nov 2026):
+ *   - frames: mass from SOA Table 6-1 (3U 0.35 kg, 6U 0.9–1.9 kg, 12U 1.84 kg);
+ *     what they can carry from the CubeSat Design Specification Rev 14.1, Table 1
+ *     (3U 6 kg, 6U 12 kg, 12U 24 kg)
+ *   - solar: deployable arrays about 35–75 W/kg, body-mounted 6U 18–28 W (SOA ch. 3)
+ *   - batteries: Li-ion packs about 58–250 Wh/kg (SOA ch. 3)
+ *   - radios: UHF up to ~64 kbps, S-band 0.1–100 Mbps, X-band 10–670 Mbps (SOA Table 9-3)
+ *   - pointing: about 0.1° (Arcus ADC) to 0.003° (BCT XACT-15) (SOA Table 5-2)
+ * Costs are game estimates: NASA does not publish part prices.
  */
 
 import type { Part } from '../types'
 
-const SOA = 'NASA Small Spacecraft Technology State of the Art (2024)'
+const SOA = 'NASA State-of-the-Art of Small Spacecraft Technology (2026)'
+const CDS = 'CubeSat Design Specification Rev 14.1 (Cal Poly, 2022), Table 1'
 
 export const PARTS: Part[] = [
   /* ---------------- structure ---------------- */
@@ -18,12 +23,12 @@ export const PARTS: Part[] = [
     name: '3U CubeSat frame',
     category: 'structure',
     tier: 'simple',
-    massKg: 0.4,
+    massKg: 0.35,
     costM: 0.05,
     powerDrawW: 0,
-    maxLoadKg: 4,
-    explain: 'A box about the size of a loaf of bread. Cheap and light, but it can only carry about 4 kg in total.',
-    source: `${SOA}, ch. 6 Structures`,
+    maxLoadKg: 6,
+    explain: 'A box about the size of a loaf of bread. Cheap and light, but it can only carry about 6 kg in total.',
+    source: `${SOA}, Table 6-1 (frame mass); ${CDS} (6 kg limit)`,
   },
   {
     id: 'frame-6u',
@@ -35,19 +40,19 @@ export const PARTS: Part[] = [
     powerDrawW: 0,
     maxLoadKg: 12,
     explain: 'Twice the size of a 3U. Room for a bigger camera or a second instrument.',
-    source: `${SOA}, ch. 6 Structures`,
+    source: `${SOA}, Table 6-1 (frame mass); ${CDS} (12 kg limit)`,
   },
   {
     id: 'frame-12u',
     name: '12U CubeSat frame',
     category: 'structure',
     tier: 'simple',
-    massKg: 2,
+    massKg: 1.8,
     costM: 0.12,
     powerDrawW: 0,
     maxLoadKg: 24,
     explain: 'The biggest common CubeSat. Fits several instruments, a big battery and large solar panels.',
-    source: `${SOA}, ch. 6 Structures`,
+    source: `${SOA}, Table 6-1 (frame mass); ${CDS} (24 kg limit)`,
   },
   {
     id: 'bus-micro',
@@ -59,7 +64,7 @@ export const PARTS: Part[] = [
     powerDrawW: 0,
     maxLoadKg: 100,
     explain: 'A small-car-tyre-sized satellite body. Carries heavy instruments, but needs a bigger rocket.',
-    source: `${SOA}, ch. 6 Structures`,
+    source: `${SOA}, ch. 2 Complete Spacecraft Platforms and ch. 6 Structures`,
   },
 
   /* ---------------- power (solar) ---------------- */
@@ -80,7 +85,7 @@ export const PARTS: Part[] = [
     name: 'Fold-out solar wings',
     category: 'power',
     tier: 'simple',
-    massKg: 1.5,
+    massKg: 1,
     costM: 0.4,
     powerDrawW: 0,
     powerGenW: 40,
@@ -92,7 +97,7 @@ export const PARTS: Part[] = [
     name: 'Large deployable array',
     category: 'power',
     tier: 'advanced',
-    massKg: 4,
+    massKg: 2.5,
     costM: 1.2,
     powerDrawW: 0,
     powerGenW: 120,
@@ -149,7 +154,7 @@ export const PARTS: Part[] = [
     powerDrawW: 2,
     storageMbit: 16_000,
     explain: 'Runs the spacecraft and stores 2 GB of data until it can be sent home.',
-    source: `${SOA}, ch. 8 Command and Data Handling`,
+    source: `${SOA}, ch. 8 SmallSat Avionics`,
   },
   {
     id: 'obc',
@@ -161,7 +166,7 @@ export const PARTS: Part[] = [
     powerDrawW: 3,
     storageMbit: 64_000,
     explain: 'Same job with 8 GB of storage, so less data is lost when the radio can’t keep up.',
-    source: `${SOA}, ch. 8 Command and Data Handling`,
+    source: `${SOA}, ch. 8 SmallSat Avionics`,
   },
   {
     id: 'obc-big',
@@ -173,7 +178,7 @@ export const PARTS: Part[] = [
     powerDrawW: 6,
     storageMbit: 512_000,
     explain: 'Stores 64 GB, enough to hold weeks of camera images between ground passes.',
-    source: `${SOA}, ch. 8 Command and Data Handling`,
+    source: `${SOA}, ch. 8 SmallSat Avionics`,
   },
 
   /* ---------------- comms (radio) ---------------- */
@@ -188,7 +193,7 @@ export const PARTS: Part[] = [
     dataRateKbps: 9.6,
     maxRangeKm: 2_000,
     explain: 'A simple radio like a walkie-talkie. Fine for status messages, far too slow for images.',
-    source: `${SOA}, ch. 9 Communications`,
+    source: `${SOA}, ch. 9 Communications, Table 9-3`,
   },
   {
     id: 'sband',
@@ -201,7 +206,7 @@ export const PARTS: Part[] = [
     dataRateKbps: 1_000,
     maxRangeKm: 40_000,
     explain: 'The usual small-satellite radio: fast enough for pictures from low orbit, and reaches GEO.',
-    source: `${SOA}, ch. 9 Communications`,
+    source: `${SOA}, ch. 9 Communications, Table 9-3`,
   },
   {
     id: 'xband',
@@ -214,7 +219,7 @@ export const PARTS: Part[] = [
     dataRateKbps: 20_000,
     maxRangeKm: 2_000_000,
     explain: 'A high-speed radio that needs good pointing and power. Reaches as far as the L1 point.',
-    source: `${SOA}, ch. 9 Communications`,
+    source: `${SOA}, ch. 9 Communications, Table 9-3`,
   },
   {
     id: 'deep-transponder',
@@ -224,10 +229,10 @@ export const PARTS: Part[] = [
     massKg: 1.2,
     costM: 2,
     powerDrawW: 35,
-    dataRateKbps: 256, // JPL Iris supports up to 256 kbps
+    dataRateKbps: 256, // game value for an Iris-class deep-space radio
     maxRangeKm: 1_000_000_000,
     explain: 'Talks to NASA’s Deep Space Network dishes from millions of km away. Slower than radios near Earth.',
-    source: `${SOA}, ch. 9 Communications (e.g. JPL Iris)`,
+    source: `${SOA}, ch. 9 Communications (deep-space radios such as JPL Iris; speed is a game value)`,
   },
 
   /* ---------------- attitude (pointing) ---------------- */
@@ -241,7 +246,7 @@ export const PARTS: Part[] = [
     powerDrawW: 0.5,
     pointingDeg: 5,
     explain: 'Electromagnets that push against Earth’s magnetic field. Cheap, but the aim wobbles by about 5°.',
-    source: `${SOA}, ch. 5 Guidance, Navigation and Control`,
+    source: `${SOA}, ch. 5 Guidance, Navigation, and Control, Table 5-2`,
   },
   {
     id: 'wheels',
@@ -253,7 +258,7 @@ export const PARTS: Part[] = [
     powerDrawW: 4,
     pointingDeg: 0.1,
     explain: 'Spinning wheels that turn the spacecraft precisely, so cameras can aim within 0.1°.',
-    source: `${SOA}, ch. 5 Guidance, Navigation and Control`,
+    source: `${SOA}, ch. 5 Guidance, Navigation, and Control, Table 5-2`,
   },
   {
     id: 'star-tracker',
@@ -265,6 +270,6 @@ export const PARTS: Part[] = [
     powerDrawW: 6,
     pointingDeg: 0.01,
     explain: 'A camera that recognises stars to know exactly where it points, for the sharpest instruments.',
-    source: `${SOA}, ch. 5 Guidance, Navigation and Control`,
+    source: `${SOA}, ch. 5 Guidance, Navigation, and Control, Table 5-2`,
   },
 ]
