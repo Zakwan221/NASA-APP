@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import type { LeaderboardMode } from '../../../multiplayer/missionApi'
 import { Shell } from '../operate/OperatePage'
 import LeaderboardTable from './LeaderboardTable'
@@ -14,7 +14,10 @@ const MODES: { id: LeaderboardMode; label: string }[] = [
 /** /mission/leaderboard: best score per name, per scenario */
 export default function LeaderboardPage() {
   const scenarios = Object.entries(SCENARIO_NAMES)
-  const [scenarioId, setScenarioId] = useState(scenarios[0][0])
+  // ?s=<scenario> opens that tab, so "See the leaderboard" lands on the mission just played
+  const [params] = useSearchParams()
+  const asked = params.get('s')
+  const [scenarioId, setScenarioId] = useState(asked && SCENARIO_NAMES[asked] ? asked : scenarios[0][0])
   const [mode, setMode] = useState<LeaderboardMode>('all')
 
   return (

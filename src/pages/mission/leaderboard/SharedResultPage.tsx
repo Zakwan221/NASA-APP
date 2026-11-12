@@ -133,7 +133,7 @@ export default function SharedResultPage() {
         >
           {isMine ? 'Fly again' : `Try to beat ${result.total}`}
         </Link>
-        <Link to="/mission/leaderboard" className="text-sm text-cyan-300 underline-offset-4 hover:underline">
+        <Link to={`/mission/leaderboard?s=${result.scenario_id}`} className="text-sm text-cyan-300 underline-offset-4 hover:underline">
           See the full leaderboard
         </Link>
       </div>

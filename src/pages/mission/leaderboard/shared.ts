@@ -3,10 +3,12 @@
  * Browser storage can be blocked (private mode), so every access is wrapped.
  */
 
-/** Scenario names for the leaderboard tabs. Switch to Ibad's scenarios in src/game/data/ when they exist. */
-export const SCENARIO_NAMES: Record<string, string> = {
-  'earth-watch': 'Earth watch',
-}
+import { SCENARIOS } from '../../../game/data/scenarios'
+
+/** Scenario names for the leaderboard tabs: every scenario, short name before the colon */
+export const SCENARIO_NAMES: Record<string, string> = Object.fromEntries(
+  SCENARIOS.map((s) => [s.id, s.title.split(':')[0].trim()]),
+)
 
 export const scenarioName = (id: string) => SCENARIO_NAMES[id] ?? id
 
