@@ -1,4 +1,6 @@
 import type { OperateState } from '../../../game/events/operate'
+import { eventNote } from '../nasa/nasaText'
+import { useMissionNasa } from '../nasa/useMissionNasa'
 
 /** Small pieces shared by the Operate and Report screens */
 
@@ -14,6 +16,7 @@ export function Stat({ label, value }: { label: string; value: string }) {
 const TONE = { good: 'text-emerald-300', bad: 'text-rose-300', info: 'text-slate-200' }
 
 export function MissionLog({ state }: { state: OperateState }) {
+  const { data } = useMissionNasa()
   if (state.log.length === 0) return null
   return (
     <section className="mt-6 text-left">
@@ -25,6 +28,7 @@ export function MissionLog({ state }: { state: OperateState }) {
               Month {l.month} · {l.title}
             </p>
             <p className="mt-1 text-slate-300">{l.text}</p>
+            {eventNote(l.title, data) && <p className="mt-1.5 text-xs text-cyan-200/90">{eventNote(l.title, data)}</p>}
           </li>
         ))}
       </ol>

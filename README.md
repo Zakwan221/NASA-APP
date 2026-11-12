@@ -90,3 +90,16 @@ Never paste the Supabase `service_role` / secret key into Claude or the repo.
 ## Tech
 
 React + Vite + TypeScript · Tailwind CSS v4 · React Router · React Three Fiber · Framer Motion
+
+## Real NASA data in the game
+
+Each mission shows live NASA data (`src/pages/mission/nasa/`, `src/lib/nasaMission.ts`):
+
+| Mission | NASA API | Shown |
+|---|---|---|
+| Earth watch | EONET | Wildfires in Southeast Asia (last 90 days), nearest to Malaysia |
+| Solar storm watch | DONKI | Solar storms (CMEs) of the last 30 days, latest and fastest |
+| Asteroid scout | NeoWs | Today's closest asteroid as the mission target |
+
+If NASA can't be reached, the game uses the saved copy in `src/game/data/nasa-snapshot.json`.
+Refresh it with `npm run nasa:snapshot` (uses `VITE_NASA_KEY` from `.env`).
