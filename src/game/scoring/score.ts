@@ -107,8 +107,8 @@ export function scoreMission(s: OperateSummary, opts: { team: boolean } = { team
   })
 
   // ---- Handling surprises (15): how well the spacecraft rode out events ----
-  // Mission control answers every event with its standard response, so this
-  // rewards a sturdy design: spare power, a reliable radio, money in reserve.
+  // The player (or the crew, by vote) answers each event; a choice that ends
+  // badly costs points. A sturdy design makes the risky choices safer.
   const events = s.log.filter((l) => l.decision)
   const badOutcomes = events.filter((l) => l.tone === 'bad').length
   const teamwork = Math.round(15 * (events.length ? 1 - badOutcomes / events.length : 1))
@@ -122,7 +122,7 @@ export function scoreMission(s: OperateSummary, opts: { team: boolean } = { team
       : 'No surprises this time: a smooth flight.',
     tip:
       teamwork < 15
-        ? 'A sturdier spacecraft rides out surprises better: keep spare power and budget, and pick parts that work most of the time.'
+        ? 'Read each surprise before choosing: the safe choice costs a little now, the risky one can cost the mission. Spare power and budget make surprises easier.'
         : undefined,
   })
 

@@ -1,12 +1,17 @@
 import { motion } from 'framer-motion'
 import { useMemo, useState, type ReactNode } from 'react'
+import { EVENTS } from '../../../game/events/events'
 import {
   activeInstruments,
+  chooseEventOption,
   downlinkPerMonthMbit,
-  flyMonth,
+  FOCUS,
+  runMonth,
+  setFocus,
   startOperate,
   toggleInstrument,
   type FlightSpacecraft,
+  type MissionFocus,
   type OperateState,
 } from '../../../game/events/operate'
 import { newSeed } from '../../../game/events/random'
@@ -47,7 +52,9 @@ export default function OperatePage({
         craft={craft}
         state={state}
         onToggle={(id, on) => setState((s) => toggleInstrument(s, id, on))}
-        onFly={() => setState((s) => flyMonth(craft, s))}
+        onFly={() => setState((s) => (s.pending ? s : runMonth(craft, s)))}
+        onChoose={(i) => setState((s) => chooseEventOption(craft, s, i))}
+        onFocus={(f) => setState((s) => setFocus(s, f))}
       />
     </Shell>
   )
@@ -58,6 +65,14 @@ export interface OperateViewProps {
   state: OperateState
   onToggle: (instrumentId: string, on: boolean) => void
   onFly: () => void
+  /** Answer the surprise event with this choice */
+  onChoose: (choiceIndex: number) => void
+  /** Pick the plan for the coming month */
+  onFocus: (focus: MissionFocus) => void
+  /** Team mode: false for players who don't pick the month's plan */
+  canFocus?: boolean
+  /** Team mode: replaces the event choice buttons (e.g. the crew vote) */
+  eventControl?: ReactNode
   /** Team mode: false for players who don't control the instruments */
   canToggle?: boolean
   /** Shown under the instruments when switching is locked */
@@ -74,6 +89,10 @@ export function OperateView({
   state,
   onToggle,
   onFly,
+  onChoose,
+  onFocus,
+  canFocus = true,
+  eventControl,
   canToggle = true,
   toggleNote,
   flyControl,
@@ -85,6 +104,9 @@ export function OperateView({
   const instrumentW = activeInstruments(craft, state).reduce((s, i) => s + i.powerDrawW, 0)
   const avgGenW = solarW * (1 - craft.orbit.shadowFraction) * (0.5 + state.health / 200)
   const downlink = useMemo(() => downlinkPerMonthMbit(craft), [craft])
+  const monthsLeft = state.totalMonths - state.month
+  // Science pace: what the mission will bring home if every month goes like the average so far
+  const pace = state.month > 0 ? Math.round((state.scienceReturned / state.month) * state.totalMonths) : null
 
   return (
     <>
@@ -141,20 +163,23 @@ export function OperateView({
         <Gauge
           label="Health"
           value={`${state.health}%`}
-          sub={`Battery at ${Math.round(state.batteryFactor * 100)}%`}
+          sub={`Battery holds ${Math.round(state.batteryFactor * 100)}% of its first charge`}
           fill={state.health / 100}
           warn={state.health < 50}
         />
         <Gauge
           label="Science sent home"
           value={`${Math.round(state.scienceReturned).toLocaleString()}`}
-          sub={`Goal ${craft.scenario.scienceTarget.toLocaleString()}`}
+          sub={`Goal ${craft.scenario.scienceTarget.toLocaleString()}${
+            pace === null ? '' : pace >= craft.scenario.scienceTarget ? ' · on track' : ` · on pace for ${pace.toLocaleString()}`
+          }`}
           fill={Math.min(1, state.scienceReturned / craft.scenario.scienceTarget)}
-          good
+          good={pace === null || pace >= craft.scenario.scienceTarget}
+          warn={pace !== null && pace < craft.scenario.scienceTarget * 0.6}
         />
         <Gauge
           label="Lifetime"
-          value={`${state.totalMonths - state.month} months left`}
+          value={`${monthsLeft} ${monthsLeft === 1 ? 'month' : 'months'} left`}
           sub={craft.orbit.name}
           fill={1 - state.month / state.totalMonths}
           critical={craft.scenario.criticalResources.includes('lifetime')}
@@ -200,18 +225,25 @@ export function OperateView({
         {toggleNote && <p className="mt-3 text-sm text-slate-400">{toggleNote}</p>}
       </section>
 
-      {/* Next month (surprise events are handled by mission control, see flyMonth) */}
-      <div className="mt-6 text-center">
-        {flyControl ?? (
-          <button
-            type="button"
-            onClick={onFly}
-            className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
-          >
-            Fly month {state.month + 1} →
-          </button>
-        )}
-      </div>
+      {/* A surprise must be answered before the next month can fly */}
+      {state.pending ? (
+        <EventCard craft={craft} state={state} onChoose={onChoose} control={eventControl} />
+      ) : (
+        <>
+          <FocusPicker month={state.month + 1} focus={state.focus} onFocus={onFocus} disabled={!canFocus} />
+          <div className="mt-6 text-center">
+            {flyControl ?? (
+              <button
+                type="button"
+                onClick={onFly}
+                className="glow-violet min-h-14 rounded-full bg-violet-500 px-10 text-lg font-semibold transition hover:bg-violet-400 active:scale-[0.98]"
+              >
+                Fly month {state.month + 1} →
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Last month */}
       {state.lastReport && (
@@ -277,3 +309,95 @@ function Gauge(props: {
   )
 }
 
+
+/** A surprise in flight: what is happening, and two choices with their cost */
+function EventCard({
+  craft,
+  state,
+  onChoose,
+  control,
+}: {
+  craft: FlightSpacecraft
+  state: OperateState
+  onChoose: (choiceIndex: number) => void
+  control?: ReactNode
+}) {
+  const pending = state.pending!
+  const event = EVENTS[pending.id]
+  return (
+    <motion.section
+      key={`${state.month}-${pending.id}`}
+      aria-live="polite"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE_OUT }}
+      className="card mt-6 border-amber-300/40 p-5"
+    >
+      <p className="text-sm font-semibold uppercase tracking-wider text-amber-200">
+        Surprise before month {state.month + 1}
+      </p>
+      <h2 className="mt-1 text-2xl font-bold">
+        <span aria-hidden="true">{event.icon}</span> {event.title}
+      </h2>
+      <p className="mt-2 text-slate-200">{event.describe(craft, pending)}</p>
+      {pending.detail && <p className="mt-2 text-sm text-cyan-200/90">{pending.detail}</p>}
+      <p className="mt-1 text-xs text-slate-400">Real missions face this too: {event.source}.</p>
+      {control ?? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {event.choices.map((c, i) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => onChoose(i)}
+              className="min-h-14 rounded-2xl border border-white/15 bg-white/5 p-4 text-left transition hover:border-cyan-300/60 hover:bg-white/10 active:scale-[0.98]"
+            >
+              <span className="block font-semibold">{c.label}</span>
+              <span className="mt-1 block text-sm text-slate-300">{c.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </motion.section>
+  )
+}
+
+/** The plan for the coming month: steady, push for science, or look after the spacecraft */
+function FocusPicker({
+  month,
+  focus,
+  onFocus,
+  disabled,
+}: {
+  month: number
+  focus: MissionFocus
+  onFocus: (f: MissionFocus) => void
+  disabled: boolean
+}) {
+  return (
+    <section className="card mt-6 p-5">
+      <h2 className="text-lg font-semibold">Plan for month {month}</h2>
+      <div role="radiogroup" aria-label={`Plan for month ${month}`} className="mt-3 grid gap-2 sm:grid-cols-3">
+        {(Object.keys(FOCUS) as MissionFocus[]).map((f) => {
+          const on = f === focus
+          return (
+            <button
+              key={f}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={disabled}
+              onClick={() => onFocus(f)}
+              className={`min-h-12 rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed ${
+                on ? 'border-cyan-300 bg-cyan-300/10' : 'border-white/10 hover:bg-white/5'
+              } ${disabled && !on ? 'opacity-50' : ''}`}
+            >
+              <span className="block font-semibold">{FOCUS[f].label}</span>
+              <span className="mt-0.5 block text-xs text-slate-400">{FOCUS[f].hint}</span>
+            </button>
+          )
+        })}
+      </div>
+      {disabled && <p className="mt-3 text-sm text-slate-400">The Flight Director picks the plan.</p>}
+    </section>
+  )
+}
