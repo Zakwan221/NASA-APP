@@ -65,7 +65,7 @@ export interface MissionOp {
   id: number
   attempt: number
   kind: MissionOpKind
-  payload: { instrumentId?: string; on?: boolean; month?: number; choice?: number }
+  payload: { instrumentId?: string; on?: boolean; month?: number; choice?: number; focus?: string }
   by: string
 }
 
