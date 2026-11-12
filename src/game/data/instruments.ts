@@ -124,7 +124,7 @@ export const INSTRUMENTS: Instrument[] = [
     id: 'nir-spectro',
     name: 'Infrared spectrometer',
     kind: 'spectrometer',
-    tier: 'advanced',
+    tier: 'simple', // shown at Cadet: with only the navigation camera, Asteroid scout can't reach its science goal
     massKg: 1.8,
     costM: 1.1,
     powerDrawW: 9,

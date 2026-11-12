@@ -96,7 +96,7 @@ export const PARTS: Part[] = [
     id: 'solar-large',
     name: 'Large deployable array',
     category: 'power',
-    tier: 'advanced',
+    tier: 'simple', // shown at Cadet too: the deep-space radio needs the power
     massKg: 2.5,
     costM: 1.2,
     powerDrawW: 0,
@@ -212,7 +212,7 @@ export const PARTS: Part[] = [
     id: 'xband',
     name: 'X-band radio',
     category: 'comms',
-    tier: 'advanced',
+    tier: 'simple', // shown at Cadet too: L1 and deep space need it
     massKg: 0.8,
     costM: 0.8,
     powerDrawW: 15,
@@ -225,7 +225,7 @@ export const PARTS: Part[] = [
     id: 'deep-transponder',
     name: 'Deep-space transponder',
     category: 'comms',
-    tier: 'advanced',
+    tier: 'simple', // shown at Cadet too: L1 and deep space need it
     massKg: 1.2,
     costM: 2,
     powerDrawW: 35,

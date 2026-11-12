@@ -103,11 +103,40 @@ export interface OperateState {
   instrumentsOn: Record<string, boolean>
   brokenInstruments: string[]
   pending: PendingEvent | null
+  /** The plan for the coming month */
+  focus: MissionFocus
   modifiers: MonthModifiers
   log: LogEntry[]
   lastReport: MonthReport | null
   ended: { success: boolean; reason: string } | null
   seed: number
+}
+
+/** The plan for each month, picked by the player (in a team, the Flight Director) */
+export type MissionFocus = 'steady' | 'push' | 'care'
+
+export const FOCUS: Record<MissionFocus, { label: string; hint: string; output: number; batteryWear: number; healthChange: number }> = {
+  steady: {
+    label: 'Steady',
+    hint: 'Normal work. The battery wears a little each month.',
+    output: 1,
+    batteryWear: 0.01,
+    healthChange: 0,
+  },
+  push: {
+    label: 'Push science',
+    hint: '30% more science and data (if the radio can send it home), but the battery wears three times faster and the craft runs hot.',
+    output: 1.3,
+    batteryWear: 0.03,
+    healthChange: -3,
+  },
+  care: {
+    label: 'Look after it',
+    hint: '30% less science, but the battery rests and engineers fix small problems (health +5).',
+    output: 0.7,
+    batteryWear: 0,
+    healthChange: 5,
+  },
 }
 
 const NO_MODIFIERS: MonthModifiers = { safeMode: false, downlinkFactor: 1, scienceFactor: 1, extraPowerDrawW: 0 }
@@ -156,6 +185,7 @@ export function startOperate(craft: FlightSpacecraft, seed: number): OperateStat
     instrumentsOn: Object.fromEntries(craft.instruments.map((i) => [i.id, true])),
     brokenInstruments: [],
     pending: null,
+    focus: 'steady',
     modifiers: { ...NO_MODIFIERS },
     log: [],
     lastReport: null,
@@ -181,6 +211,12 @@ export function toggleInstrument(state: OperateState, instrumentId: string, on: 
   return { ...state, instrumentsOn: { ...state.instrumentsOn, [instrumentId]: on } }
 }
 
+/** Choose the plan for the coming month. */
+export function setFocus(state: OperateState, focus: MissionFocus): OperateState {
+  if (state.ended || !(focus in FOCUS)) return state
+  return { ...state, focus }
+}
+
 /** Answer the event card. Must happen before the next month can run. */
 export function chooseEventOption(craft: FlightSpacecraft, state: OperateState, choiceIndex: number): OperateState {
   if (!state.pending) return state
@@ -197,7 +233,7 @@ export function chooseEventOption(craft: FlightSpacecraft, state: OperateState, 
       ...result.state.log,
       {
         month: state.month + 1,
-        title: `${event.title}: mission control chose “${choice.label}”`,
+        title: `${event.title}: chose “${choice.label}”`,
         text: result.message,
         tone: result.tone,
         decision: true,
@@ -207,9 +243,10 @@ export function chooseEventOption(craft: FlightSpacecraft, state: OperateState, 
 }
 
 /**
- * Fly one month. If a surprise event starts, mission control answers it at once
+ * Fly one month without stopping for questions: any surprise event is answered
  * with its standard response (the first choice: safe mode, move out of the way,
- * reboot…), so the game never stops for a question. The outcome goes in the log.
+ * reboot…). Used by test flights and by older team moves. Players answer events
+ * themselves with chooseEventOption, then call runMonth.
  */
 export function flyMonth(craft: FlightSpacecraft, state: OperateState): OperateState {
   const next = runMonth(craft, state.pending ? chooseEventOption(craft, state, 0) : state)
@@ -267,14 +304,23 @@ export function runMonth(craft: FlightSpacecraft, state: OperateState): OperateS
   }
   if (m.safeMode) notes.push('Safe mode: instruments were off this month, so no new science.')
 
+  const focus = FOCUS[state.focus] ?? FOCUS.steady
+  health = Math.min(100, health + focus.healthChange)
+  if (state.focus === 'push') {
+    notes.push('Push science: the instruments worked harder (+30% science and data), the battery wore faster and the spacecraft ran hot (health −3).')
+  } else if (state.focus === 'care') {
+    notes.push('Look after it: lighter work (−30% science and data), the battery rested and the engineers fixed small problems (health +5).')
+  }
+
   // ---- data and science ----
   const days = OPS.daysPerTurn
-  const dataMadeMbit = active.reduce((sum, i) => sum + i.dataPerDayMbit, 0) * days * instrumentUptime
+  const dataMadeMbit = active.reduce((sum, i) => sum + i.dataPerDayMbit, 0) * days * instrumentUptime * focus.output
   const scienceMade =
     active.reduce((sum, i) => sum + i.scienceValue * (craft.orbit.coverage[craft.scenario.id] ?? 0.5), 0) *
     days *
     instrumentUptime *
-    m.scienceFactor
+    m.scienceFactor *
+    focus.output
 
   let stored = state.dataStoredMbit + dataMadeMbit
   let sciStored = state.scienceStored + scienceMade
@@ -303,7 +349,7 @@ export function runMonth(craft: FlightSpacecraft, state: OperateState): OperateS
   const budgetLeftM = state.budgetLeftM - costM
 
   // ---- battery ageing ----
-  const batteryFactor = Math.max(0.3, state.batteryFactor - 0.01)
+  const batteryFactor = Math.max(0.3, state.batteryFactor - focus.batteryWear)
 
   const report: MonthReport = {
     month,

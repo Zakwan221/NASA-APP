@@ -7,10 +7,13 @@
 
 import {
   chooseEventOption,
-  flyMonth,
+  FOCUS,
+  runMonth,
+  setFocus,
   startOperate,
   toggleInstrument,
   type FlightSpacecraft,
+  type MissionFocus,
   type OperateState,
 } from '../game/events/operate'
 import type { MissionOp } from './missionApi'
@@ -25,8 +28,11 @@ export function replayOps(craft: FlightSpacecraft, seed: number, ops: MissionOp[
     } else if (op.kind === 'choice' && state.pending && p.month === state.month + 1 && typeof p.choice === 'number') {
       state = chooseEventOption(craft, state, p.choice)
     } else if (op.kind === 'fly' && p.month === state.month + 1) {
-      // Surprise events are answered automatically (see flyMonth)
-      state = flyMonth(craft, state)
+      // The host flies with the month's plan. A surprise nobody answered
+      // (moves from before event votes came back) gets the standard response.
+      if (typeof p.focus === 'string' && p.focus in FOCUS) state = setFocus(state, p.focus as MissionFocus)
+      if (state.pending) state = chooseEventOption(craft, state, 0)
+      state = runMonth(craft, state)
     }
   }
   return state
