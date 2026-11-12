@@ -1,5 +1,7 @@
 /**
- * STARTER launch options (Ibad owns this folder: check numbers and sources).
+ * Launch options. The small launcher is based on Rocket Lab Electron
+ * (300 kg to low orbit, 200 kg to SSO, about US$7.5 M, 4 failures in 99 launches
+ * by Nov 2026). Rideshare and medium-rocket prices are game estimates.
  * Small satellites usually buy a slot on someone else's rocket (rideshare),
  * or pay for a whole small rocket to choose their own orbit.
  * failureRate: rough share of failed launches for that class of rocket
@@ -8,7 +10,7 @@
 
 import type { LaunchVehicle } from '../types'
 
-const SOA = 'NASA Small Spacecraft Technology State of the Art (2024), ch. 10 Launch'
+const SOA = 'NASA State-of-the-Art of Small Spacecraft Technology (2026), Launch, Integration, Deployment, and Orbital Transport'
 
 export const ROCKETS: LaunchVehicle[] = [
   {
@@ -27,9 +29,9 @@ export const ROCKETS: LaunchVehicle[] = [
     costM: 7.5,
     capacityKg: { leo: 300, sso: 200 },
     riskOfIssue: 0.08,
-    failureRate: 0.06,
+    failureRate: 0.04,
     explain: 'A whole small rocket just for you (like Rocket Lab Electron): heavier spacecraft, but it costs much more.',
-    source: SOA,
+    source: 'Rocket Lab Electron: 300 kg to LEO, 200 kg to SSO, about US$7.5 M (Wikipedia, Nov 2026)',
   },
   {
     id: 'rideshare-geo',
