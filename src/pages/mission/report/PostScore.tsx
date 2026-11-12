@@ -37,7 +37,7 @@ export default function PostScore({ craft, score }: { craft: FlightSpacecraft; s
     }
   }
 
-  if (posted) return <ShareBox id={posted} total={score.total} />
+  if (posted) return <ShareBox id={posted} total={score.total} scenarioId={craft.scenario.id} />
 
   return (
     <form onSubmit={post} className="card mt-6 p-5">
@@ -75,7 +75,7 @@ export default function PostScore({ craft, score }: { craft: FlightSpacecraft; s
 }
 
 /** After posting: share the link or open the board */
-export function ShareBox({ id, total }: { id: string; total: number }) {
+export function ShareBox({ id, total, scenarioId }: { id: string; total: number; scenarioId?: string }) {
   const [status, setStatus] = useState<'idle' | 'shared' | 'copied' | 'failed'>('idle')
   const url = shareUrl(id)
 
@@ -92,7 +92,7 @@ export function ShareBox({ id, total }: { id: string; total: number }) {
           {status === 'copied' ? 'Link copied' : 'Share my mission'}
         </button>
         <Link
-          to="/mission/leaderboard"
+          to={scenarioId ? `/mission/leaderboard?s=${scenarioId}` : '/mission/leaderboard'}
           className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-white/10 px-6 font-semibold transition hover:bg-white/15 active:scale-[0.98]"
         >
           See the leaderboard

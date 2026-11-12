@@ -675,7 +675,7 @@ function TeamLeaderboard({ scenarioId, attempt }: { scenarioId: string; attempt:
     <section className="card mt-6 p-3 sm:p-4">
       <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
         <h2 className="font-semibold">Leaderboard · {scenarioName(scenarioId)}</h2>
-        <Link to="/mission/leaderboard" className="text-sm text-cyan-300 underline-offset-4 hover:underline">
+        <Link to={`/mission/leaderboard?s=${scenarioId}`} className="text-sm text-cyan-300 underline-offset-4 hover:underline">
           See all
         </Link>
       </div>
