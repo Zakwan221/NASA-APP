@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createMissionRoom, joinMissionRoom } from '../../../multiplayer/missionApi'
 import { errorText } from '../../../multiplayer/useMissionRoom'
 import { Shell } from '../operate/OperatePage'
-import { PLACEHOLDER_CRAFT } from '../operate/placeholderCraft'
 
 const inputClass =
   'w-full rounded-xl border border-white/15 bg-space-800 px-4 py-3 text-lg text-white outline-none focus:border-cyan-300'
@@ -27,15 +26,7 @@ export default function TeamStart({ mode }: { mode: 'host' | 'join' }) {
     try {
       const room =
         mode === 'host'
-          ? await createMissionRoom(nickname, {
-              // Until the Design screen exists, every team flies the placeholder mission
-              planner: {
-                scenarioId: PLACEHOLDER_CRAFT.scenario.id,
-                difficulty: PLACEHOLDER_CRAFT.difficulty,
-                targetLifetimeMonths: PLACEHOLDER_CRAFT.targetLifetimeMonths,
-                targetCoverage: 0.5,
-              },
-            })
+          ? await createMissionRoom(nickname) // the crew picks the mission and builds the spacecraft together
           : await joinMissionRoom(code, nickname)
       navigate(`/mission/team/${room.code}`)
     } catch (err) {

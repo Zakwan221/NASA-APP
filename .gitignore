@@ -30,3 +30,7 @@ dist-ssr
 
 # Claude Code skill output
 .taste-skill/
+.vercel
+
+.vercel
+.env*

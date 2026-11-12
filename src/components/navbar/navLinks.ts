@@ -8,5 +8,4 @@ export const NAV_LINKS: NavItem[] = [
   { label: 'Home', to: '/' },
   { label: 'Info', to: '/info' },
   { label: 'Mission', to: '/mission' },
-  { label: 'Games', to: '/games' },
 ]
