@@ -103,3 +103,12 @@ Each mission shows live NASA data (`src/pages/mission/nasa/`, `src/lib/nasaMissi
 
 If NASA can't be reached, the game uses the saved copy in `src/game/data/nasa-snapshot.json`.
 Refresh it with `npm run nasa:snapshot` (uses `VITE_NASA_KEY` from `.env`).
+
+
+
+## Use of AI
+
+Parts of this code were written with help from Claude Code (an AI coding assistant).
+Commits made with AI help are marked `Co-Authored-By: Claude` in the Git history.
+The game idea, mission design, mechanics and scoring are our own, and the team
+reviewed and tested all AI-assisted code. No AI-generated images are used.
