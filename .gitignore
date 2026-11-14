@@ -34,3 +34,7 @@ dist-ssr
 
 .vercel
 .env*
+
+# Local AI tool settings (never pushed)
+.claude/
+CLAUDE.md
